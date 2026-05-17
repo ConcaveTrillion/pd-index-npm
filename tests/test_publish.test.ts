@@ -12,7 +12,6 @@ async function makeRoot(): Promise<string> {
   return mkdtemp(join(tmpdir(), "pd-index-npm-pub-"));
 }
 
-/** Start a tiny HTTP server serving static bytes from a map of path->Buffer. */
 function startFileServer(
   files: Record<string, Buffer>,
 ): Promise<{ server: Server; baseUrl: string }> {
@@ -53,23 +52,22 @@ test("publish drops the tarball into the right encoded path", async () => {
   assert.equal(result.packageName, "@concavetrillion/pd-ui");
   assert.equal(result.version, "0.1.0-alpha");
 
-  // Tarball at rest
+  // Tarball at rest: uses real slash path
   const tgzAtRest = await readFile(
-    join(root, "@concavetrillion%2fpd-ui", "-", "pd-ui-0.1.0-alpha.tgz"),
+    join(root, "@concavetrillion", "pd-ui", "-", "pd-ui-0.1.0-alpha.tgz"),
   );
   assert.equal(tgzAtRest.byteLength, tarballBytes.byteLength);
 
-  // Packument written
+  // Packument at index.html
   const packument = JSON.parse(
     await readFile(
-      join(root, "@concavetrillion%2fpd-ui", "index.html"),
+      join(root, "@concavetrillion", "pd-ui", "index.html"),
       "utf8",
     ),
   ) as {
     "dist-tags": Record<string, string>;
     versions: Record<string, unknown>;
   };
-  // Only version, so it's both latest and alpha
   assert.equal(packument["dist-tags"].latest, "0.1.0-alpha");
   assert.equal(packument["dist-tags"].alpha, "0.1.0-alpha");
 });
@@ -77,7 +75,6 @@ test("publish drops the tarball into the right encoded path", async () => {
 test("publish refuses to overwrite an existing version with different bytes", async () => {
   const root = await makeRoot();
 
-  // Publish 0.1.0 the first time
   const tarball1 = await buildMinimalTarball({
     name: "@concavetrillion/pd-ui",
     version: "0.1.0",
@@ -92,7 +89,6 @@ test("publish refuses to overwrite an existing version with different bytes", as
     baseUrl: "https://concavetrillion.github.io/pd-index-npm/",
   });
 
-  // Now try to publish a DIFFERENT 0.1.0 tarball
   const tarball2 = await buildMinimalTarball({
     name: "@concavetrillion/pd-ui",
     version: "0.1.0",
@@ -139,12 +135,7 @@ test("publish accepts a URL for the tarball, downloads it, then publishes", asyn
     assert.equal(result.version, "0.0.1");
 
     const tgzAtRest = await readFile(
-      join(
-        root,
-        "@concavetrillion%2ftest-package",
-        "-",
-        "test-package-0.0.1.tgz",
-      ),
+      join(root, "@concavetrillion", "test-package", "-", "test-package-0.0.1.tgz"),
     );
     assert.equal(tgzAtRest.byteLength, tarballBytes.byteLength);
   } finally {

@@ -4,59 +4,57 @@
  * Types and constants describing the static on-disk layout of the pd-index-npm
  * registry (the shape the gh-pages branch must have for `npm install` to work).
  *
- * The layout mirrors what Verdaccio writes to disk under storage/:
+ * The layout uses actual slash-based directory structure (NOT %2f-encoded names):
  *
- *   @concavetrillion%2fpd-ui/                             <- directory
- *   @concavetrillion%2fpd-ui/index.html                   <- packument JSON
- *                                                            (GitHub Pages serves this when
- *                                                             npm GETs /@concavetrillion%2fpd-ui
- *                                                             via 301 -> trailing slash -> index.html)
- *   @concavetrillion%2fpd-ui/-/pd-ui-0.1.0.tgz           <- tarball bytes
+ *   @concavetrillion/test-package/                         <- directory
+ *   @concavetrillion/test-package/index.html               <- packument JSON
+ *   @concavetrillion/test-package/-/test-package-0.0.1.tgz <- tarball bytes
  *
- * Note: the packument is stored as index.html so that GitHub Pages serves it
- * automatically when npm follows the redirect from /pkg to /pkg/. npm parses
- * the body as JSON regardless of Content-Type.
+ * When npm GETs `/@concavetrillion%2ftest-package`, GitHub Pages decodes the
+ * %2f to a real slash and serves the directory. GitHub Pages then serves
+ * `index.html` from that directory. npm parses the body as JSON regardless of
+ * Content-Type. This is the standard approach for GitHub Pages-hosted static
+ * npm registries (used by skypack, esm.sh, etc.).
+ *
+ * Tarball URLs in the packument also use the decoded slash form so that GitHub
+ * Pages can serve them directly: `.../pd-index-npm/@concavetrillion/test-package/-/test-package-0.0.1.tgz`
  */
 
-/** Encode a scoped npm package name for use as a URL/filesystem path segment.
- *  "@concavetrillion/pd-ui" -> "@concavetrillion%2fpd-ui"
- *  The %2f (lowercase) is what npm CLI sends; we normalise it here.
+/**
+ * Returns the package directory name for the on-disk layout.
+ * "@concavetrillion/pd-ui" -> "@concavetrillion/pd-ui"
+ * (We use the actual slash — GitHub Pages decodes %2f, so we match that.)
  */
-export function encodeScopedName(name: string): string {
-  // Replace the "/" between scope and package name with %2f
-  return name.replace("/", "%2f");
-}
-
-/** Decode a path-encoded package name back to the canonical npm name.
- *  "@concavetrillion%2fpd-ui" -> "@concavetrillion/pd-ui"
- */
-export function decodeScopedName(encoded: string): string {
-  return encoded.replace(/%2f/i, "/");
+export function packageDirFor(name: string): string {
+  return name; // e.g. "@concavetrillion/pd-ui"
 }
 
 /** Returns the tarball directory path relative to the registry root.
- *  e.g.  "@concavetrillion/pd-ui" -> "@concavetrillion%2fpd-ui/-"
+ *  "@concavetrillion/pd-ui" -> "@concavetrillion/pd-ui/-"
  */
 export function tarballDirFor(name: string): string {
-  return `${encodeScopedName(name)}/-`;
+  return `${name}/-`;
 }
 
 /**
- * Returns the packument FILE path relative to the registry root.
- * The packument is stored as index.html inside the package directory.
- * GitHub Pages serves it when npm GETs /@scope%2fname (redirected to /@scope%2fname/).
+ * Returns the packument file path relative to the registry root.
+ * Packuments are stored as index.html so GitHub Pages serves them
+ * when npm follows the redirect from /pkg to /pkg/.
  *
- * e.g.  "@concavetrillion/pd-ui" -> "@concavetrillion%2fpd-ui/index.html"
+ * "@concavetrillion/pd-ui" -> "@concavetrillion/pd-ui/index.html"
  */
 export function packumentPathFor(name: string): string {
-  return `${encodeScopedName(name)}/index.html`;
+  return `${name}/index.html`;
 }
 
-/** Constructs the absolute tarball URL for a given package + version.
- *  e.g.  baseUrl = "https://concavetrillion.github.io/pd-index-npm/"
- *        name    = "@concavetrillion/pd-ui"
- *        version = "0.1.0-alpha"
- *        -> "https://concavetrillion.github.io/pd-index-npm/@concavetrillion%2fpd-ui/-/pd-ui-0.1.0-alpha.tgz"
+/**
+ * Constructs the absolute tarball URL for a given package + version.
+ * Uses the decoded slash form so GitHub Pages can serve it directly.
+ *
+ * baseUrl = "https://concavetrillion.github.io/pd-index-npm/"
+ * name    = "@concavetrillion/pd-ui"
+ * version = "0.1.0-alpha"
+ * -> "https://concavetrillion.github.io/pd-index-npm/@concavetrillion/pd-ui/-/pd-ui-0.1.0-alpha.tgz"
  */
 export function tarballUrlFor(
   baseUrl: string,
@@ -64,10 +62,23 @@ export function tarballUrlFor(
   version: string,
 ): string {
   const base = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
-  // Unscoped package name (part after the /)
   const shortName = name.includes("/") ? name.split("/")[1] : name;
-  const encoded = encodeScopedName(name);
-  return `${base}${encoded}/-/${shortName}-${version}.tgz`;
+  return `${base}${name}/-/${shortName}-${version}.tgz`;
+}
+
+/**
+ * For compatibility: encode a scoped package name for URL usage.
+ * The on-disk layout uses real slashes, but the URL the packument
+ * exposes in dist.tarball uses the real slash form too.
+ */
+export function encodeScopedName(name: string): string {
+  // Keep for backward compat / documentation; on disk we use real slashes
+  return name.replace("/", "%2f");
+}
+
+/** Decode a path-encoded package name back to the canonical npm name. */
+export function decodeScopedName(encoded: string): string {
+  return encoded.replace(/%2f/i, "/");
 }
 
 /** Packument document shape (subset of the full npm registry packument). */

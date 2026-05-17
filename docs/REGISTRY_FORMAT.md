@@ -9,30 +9,33 @@ we serve.
 ```
 /                                          # GitHub Pages root
   index.html                               # Human-readable landing page
-  @concavetrillion%2fpd-ui/               # Package directory (scope + name, URL-encoded)
-    index.html                             # Packument JSON (served at /@concavetrillion%2fpd-ui)
-    -/                                     # Tarball directory
-      pd-ui-0.1.0-alpha.tgz
-      pd-ui-0.1.1-alpha.tgz
-  @concavetrillion%2ftest-package/
-    index.html                             # Packument JSON
-    -/
-      test-package-0.0.1.tgz
+  @concavetrillion/                        # Scope directory
+    pd-ui/                                 # Package directory
+      index.html                           # Packument JSON
+      -/                                   # Tarball directory
+        pd-ui-0.1.0-alpha.tgz
+        pd-ui-0.1.1-alpha.tgz
+    test-package/
+      index.html                           # Packument JSON
+      -/
+        test-package-0.0.1.tgz
 ```
 
-### URL encoding
+### Why real slashes (not `%2f`)
 
-Scoped package names (`@scope/name`) encode the `/` as `%2f` (lowercase). This
-matches what the npm CLI sends in its GET requests. The `encodeScopedName()`
-function in `scripts/registry-layout.ts` enforces this encoding.
+The npm protocol uses URL-encoded scoped names: `GET /@concavetrillion%2fpd-ui`.
+GitHub Pages decodes `%2f` to a real `/` when matching paths, so a request for
+`/@concavetrillion%2fpd-ui/` is served from the directory
+`@concavetrillion/pd-ui/` on the `gh-pages` branch. This is the standard
+approach for GitHub Pages-hosted static npm registries.
 
 ### Packument files
 
 The packument (the JSON document npm GETs when resolving a package) is stored as
 `index.html` inside each package directory. GitHub Pages redirects `GET
-/@concavetrillion%2fpd-ui` to `/@concavetrillion%2fpd-ui/` and then serves the
-`index.html`. The npm CLI follows the redirect and parses the body as JSON
-(Content-Type is not checked).
+/@concavetrillion%2fpd-ui` → `/@concavetrillion/pd-ui/` and serves
+`@concavetrillion/pd-ui/index.html`. npm follows the redirect and parses the
+body as JSON (Content-Type is not checked against the body).
 
 ## Packument JSON shape
 
@@ -50,7 +53,7 @@ The packument (the JSON document npm GETs when resolving a package) is stored as
       "description": "...",
       "main": "dist/index.js",
       "dist": {
-        "tarball": "https://concavetrillion.github.io/pd-index-npm/@concavetrillion%2fpd-ui/-/pd-ui-0.1.0-alpha.tgz",
+        "tarball": "https://concavetrillion.github.io/pd-index-npm/@concavetrillion/pd-ui/-/pd-ui-0.1.0-alpha.tgz",
         "shasum": "<sha1 hex, 40 chars>",
         "integrity": "sha512-<base64>"
       }
@@ -66,24 +69,21 @@ The packument (the JSON document npm GETs when resolving a package) is stored as
 }
 ```
 
-The `dist.tarball` URL is **absolute** so `npm install` doesn't have to know the
-registry's base path twice.
+The `dist.tarball` URL uses the real slash form (not `%2f`) since GitHub Pages
+serves files by their actual on-disk path.
 
 ## Upstream references
 
 - [npm registry HTTP API spec](https://github.com/npm/registry/blob/main/docs/REGISTRY-API.md)
 - [Verdaccio static-publish](https://verdaccio.org/docs/configuration/#static-publish)
-  is the closest existing reference implementation; our layout mirrors Verdaccio's
-  `storage/` directory shape.
+  is the closest existing reference implementation.
 
 ## Intentional simplifications
 
 - **No `_attachments`**: Tarballs are served as static files (not embedded as base64
-  in the packument). This is the standard for static registries.
-- **No `_rev`**: We don't implement npm's revision-tracking; the publish workflow
-  owns all mutations to `gh-pages`.
+  in the packument).
+- **No `_rev`**: The publish workflow owns all mutations to `gh-pages`.
 - **No PUT semantics**: The registry is read-only from the consumer's perspective.
-  Publishers trigger the `publish.yml` workflow which is the only writer.
 - **No `npm login`**: The registry is unauthenticated. All packages are public.
 
 ## Trust model

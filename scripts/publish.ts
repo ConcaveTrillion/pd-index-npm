@@ -4,32 +4,30 @@
  * Publishes a single .tgz tarball into the pd-index-npm static registry.
  *
  * Algorithm:
- *   1. If tarballUrl given, download to a temp file via Node 20 native fetch().
+ *   1. If tarballUrl given, download via Node 20 native fetch().
  *   2. Parse package/package.json out of the tarball to get { name, version }.
  *   3. Compute integrity (SHA-512) + shasum (SHA-1).
  *   4. Check existing packument — if same version exists with DIFFERENT shasum,
  *      throw PublishConflictError. Same-bytes re-publish is idempotent (no-op).
- *   5. Copy tarball into <root>/<encoded>/-/<name>-<version>.tgz.
+ *   5. Write tarball into <root>/@scope/name/-/<name>-<version>.tgz.
  *   6. Call rebuildPackuments({ root, baseUrl, packageName }) to refresh the packument.
  *
  * CLI usage:
- *   node dist/publish.js --tarball <path> --root <gh-pages-checkout> --base-url <url>
- *   node dist/publish.js --tarball-url <url> --root <gh-pages-checkout> --base-url <url>
+ *   node dist/scripts/publish.js --tarball <path> --root <gh-pages-checkout> --base-url <url>
+ *   node dist/scripts/publish.js --tarball-url <url> --root <gh-pages-checkout> --base-url <url>
  */
 
-import { readFile, writeFile, mkdir, copyFile, mkdtemp } from "node:fs/promises";
-import { join, basename } from "node:path";
-import { tmpdir } from "node:os";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { join, dirname } from "node:path";
 import { createHash } from "node:crypto";
 import { createGunzip } from "node:zlib";
 import { Readable } from "node:stream";
 import {
-  encodeScopedName,
   tarballDirFor,
+  packumentPathFor,
 } from "./registry-layout.js";
 import { rebuildPackuments, type RebuildOptions } from "./rebuild-packuments.js";
 
-// Re-export types
 export type { RebuildOptions };
 
 // ---------------------------------------------------------------------------
@@ -58,14 +56,14 @@ export class PublishConflictError extends Error {
   constructor(packageName: string, version: string) {
     super(
       `Version ${version} of ${packageName} is already published with different content. ` +
-        `npm versions are immutable. If you need to fix a release, publish a new version.`,
+        `npm versions are immutable. To fix a release, publish a new version.`,
     );
     this.name = "PublishConflictError";
   }
 }
 
 // ---------------------------------------------------------------------------
-// Tar parsing (minimal, no deps — shared logic with rebuild-packuments)
+// Minimal tar parser (no deps)
 // ---------------------------------------------------------------------------
 
 interface TarEntry {
@@ -163,10 +161,12 @@ export async function publish(opts: PublishOptions): Promise<PublishResult> {
   const shasum = createHash("sha1").update(tgzBuffer).digest("hex");
 
   // Step 4: Check existing packument for version conflict
-  const encodedName = encodeScopedName(packageName);
-  const packumentAbsPath = join(root, encodedName, "index.html");
+  // Packument is at <root>/@scope/name/index.html
+  const packumentAbsPath = join(root, packumentPathFor(packageName));
   try {
-    const existing = JSON.parse(await readFile(packumentAbsPath, "utf8")) as {
+    const existing = JSON.parse(
+      await readFile(packumentAbsPath, "utf8"),
+    ) as {
       versions?: Record<string, { dist?: { shasum?: string } }>;
     };
     const existingVersion = existing.versions?.[version];
@@ -175,15 +175,14 @@ export async function publish(opts: PublishOptions): Promise<PublishResult> {
       if (existingShasum && existingShasum !== shasum) {
         throw new PublishConflictError(packageName, version);
       }
-      // Idempotent re-publish of the same bytes: skip re-writing
+      // Idempotent re-publish of the same bytes: return early
       if (existingShasum === shasum) {
         const shortName = packageName.includes("/")
           ? packageName.split("/")[1]
           : packageName;
         const tarballRestingPath = join(
           root,
-          encodedName,
-          "-",
+          tarballDirFor(packageName),
           `${shortName}-${version}.tgz`,
         );
         return {
@@ -203,7 +202,7 @@ export async function publish(opts: PublishOptions): Promise<PublishResult> {
   const shortName = packageName.includes("/")
     ? packageName.split("/")[1]
     : packageName;
-  const tarballDir = join(root, encodedName, "-");
+  const tarballDir = join(root, tarballDirFor(packageName));
   await mkdir(tarballDir, { recursive: true });
   const tarballFileName = `${shortName}-${version}.tgz`;
   const tarballRestingPath = join(tarballDir, tarballFileName);
@@ -239,7 +238,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     idx("--tarball-url") >= 0 ? args[idx("--tarball-url") + 1] : undefined;
 
   if (!tarballPath && !tarballUrl) {
-    console.error("Usage: publish.js --tarball <path> | --tarball-url <url> [--root <dir>] [--base-url <url>]");
+    console.error(
+      "Usage: publish.js --tarball <path> | --tarball-url <url> [--root <dir>] [--base-url <url>]",
+    );
     process.exit(1);
   }
 

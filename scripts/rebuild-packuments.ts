@@ -2,9 +2,12 @@
  * rebuild-packuments.ts
  *
  * Scans a registry root directory (typically a gh-pages checkout), finds all
- * .tgz files under each <scope>%2f<name>/-/ directory, parses the tarball to
+ * .tgz files under each @scope/name/-/ directory, parses the tarball to
  * extract package.json, computes integrity + shasum, and (re)writes the
- * packument JSON file at <root>/<scope>%2f<name>/index.html.
+ * packument JSON file at <root>/@scope/name/index.html.
+ *
+ * The on-disk layout uses actual slash-based directories (not %2f-encoded
+ * names) so that GitHub Pages can serve them correctly.
  *
  * This is the safety-net script: run it if a packument ever drifts from the
  * actual tarballs on disk. The publish script calls it incrementally (one
@@ -19,8 +22,6 @@ import { createHash } from "node:crypto";
 import { createGunzip } from "node:zlib";
 import { Readable } from "node:stream";
 import {
-  encodeScopedName,
-  decodeScopedName,
   tarballUrlFor,
   packumentPathFor,
   type Packument,
@@ -37,15 +38,12 @@ interface TarEntry {
   data: Buffer;
 }
 
-/** Read all tar entries from a Buffer (uncompressed tar). */
 function parseTarEntries(buf: Buffer): TarEntry[] {
   const entries: TarEntry[] = [];
   let offset = 0;
   while (offset + 512 <= buf.length) {
     const header = buf.subarray(offset, offset + 512);
-    // Check for end-of-archive (two 512-byte zero blocks)
     if (header.every((b) => b === 0)) break;
-
     const name = header.subarray(0, 100).toString("utf8").replace(/\0+$/, "");
     const sizeOctal = header
       .subarray(124, 136)
@@ -54,47 +52,33 @@ function parseTarEntries(buf: Buffer): TarEntry[] {
       .trim();
     const size = parseInt(sizeOctal, 8) || 0;
     const typeFlag = header[156];
-
-    offset += 512; // skip header block
-
-    if (typeFlag === 0 || typeFlag === 48 /* '0' */) {
-      // Regular file
-      const data = buf.subarray(offset, offset + size);
-      entries.push({ name, size, data });
+    offset += 512;
+    if (typeFlag === 0 || typeFlag === 48) {
+      entries.push({ name, size, data: buf.subarray(offset, offset + size) });
     }
-
-    // Advance past data blocks (padded to 512-byte boundaries)
     offset += Math.ceil(size / 512) * 512;
   }
   return entries;
 }
 
-/** Extract package/package.json from a .tgz Buffer. */
 async function extractPackageJson(
   tgzBuffer: Buffer,
 ): Promise<Record<string, unknown>> {
-  // Gunzip
   const gunzipped = await new Promise<Buffer>((resolve, reject) => {
     const gunzip = createGunzip();
     const chunks: Buffer[] = [];
-    const readable = Readable.from(tgzBuffer);
-    readable.pipe(gunzip);
-    gunzip.on("data", (chunk: Buffer) => chunks.push(chunk));
+    Readable.from(tgzBuffer).pipe(gunzip);
+    gunzip.on("data", (c: Buffer) => chunks.push(c));
     gunzip.on("end", () => resolve(Buffer.concat(chunks)));
     gunzip.on("error", reject);
-    readable.on("error", reject);
   });
-
   const entries = parseTarEntries(gunzipped);
-  const pkgEntry = entries.find(
+  const entry = entries.find(
     (e) =>
-      e.name === "package/package.json" ||
-      e.name.endsWith("/package.json"),
+      e.name === "package/package.json" || e.name.endsWith("/package.json"),
   );
-  if (!pkgEntry) {
-    throw new Error("No package/package.json found in tarball");
-  }
-  return JSON.parse(pkgEntry.data.toString("utf8")) as Record<string, unknown>;
+  if (!entry) throw new Error("No package/package.json found in tarball");
+  return JSON.parse(entry.data.toString("utf8")) as Record<string, unknown>;
 }
 
 // ---------------------------------------------------------------------------
@@ -106,7 +90,7 @@ interface ParsedVersion {
   minor: number;
   patch: number;
   prerelease: string;
-  prereleaseTag: string; // e.g. "alpha" from "0.1.0-alpha.2"
+  prereleaseTag: string;
   raw: string;
 }
 
@@ -116,7 +100,9 @@ function parseVersion(v: string): ParsedVersion {
   );
   if (!match) throw new Error(`Invalid semver: ${v}`);
   const prerelease = match[4] ?? "";
-  const prereleaseTag = prerelease.split(".")[0].replace(/\d+$/, "") || prerelease.split(".")[0];
+  const prereleaseTag =
+    prerelease.split(".")[0].replace(/\d+$/, "") ||
+    prerelease.split(".")[0];
   return {
     major: parseInt(match[1], 10),
     minor: parseInt(match[2], 10),
@@ -127,17 +113,14 @@ function parseVersion(v: string): ParsedVersion {
   };
 }
 
-/** Compare two version strings. Returns negative / 0 / positive. */
 function semverCompare(a: string, b: string): number {
   const pa = parseVersion(a);
   const pb = parseVersion(b);
   if (pa.major !== pb.major) return pa.major - pb.major;
   if (pa.minor !== pb.minor) return pa.minor - pb.minor;
   if (pa.patch !== pb.patch) return pa.patch - pb.patch;
-  // A prerelease version is always lower than the release version
   if (!pa.prerelease && pb.prerelease) return 1;
   if (pa.prerelease && !pb.prerelease) return -1;
-  // Both have prerelease or neither does
   if (pa.prerelease < pb.prerelease) return -1;
   if (pa.prerelease > pb.prerelease) return 1;
   return 0;
@@ -148,16 +131,54 @@ function semverCompare(a: string, b: string): number {
 // ---------------------------------------------------------------------------
 
 export interface RebuildOptions {
-  /** Path to the registry root (gh-pages checkout or local fixture). */
   root: string;
-  /** Base URL of the registry, e.g. "https://concavetrillion.github.io/pd-index-npm/" */
   baseUrl: string;
-  /** Optional: only rebuild this one packument (canonical npm name). */
   packageName?: string;
 }
 
 export interface RebuildResult {
   rebuilt: string[];
+}
+
+/**
+ * Walk the registry root for scope directories (@...) and find packages.
+ * Returns an array of canonical package names like "@concavetrillion/pd-ui".
+ */
+async function findPackages(root: string, filterName?: string): Promise<string[]> {
+  const results: string[] = [];
+  let scopeDirs: string[];
+  try {
+    scopeDirs = (await readdir(root)).filter((e) => e.startsWith("@"));
+  } catch {
+    return results;
+  }
+
+  for (const scopeDir of scopeDirs) {
+    if (filterName && !filterName.startsWith(scopeDir)) continue;
+    const scopePath = join(root, scopeDir);
+    let pkgDirs: string[];
+    try {
+      const s = await stat(scopePath);
+      if (!s.isDirectory()) continue;
+      pkgDirs = await readdir(scopePath);
+    } catch {
+      continue;
+    }
+
+    for (const pkgDir of pkgDirs) {
+      const canonicalName = `${scopeDir}/${pkgDir}`;
+      if (filterName && canonicalName !== filterName) continue;
+      // Check if there's a -/ tarball directory
+      const tarballDir = join(scopePath, pkgDir, "-");
+      try {
+        const s = await stat(tarballDir);
+        if (s.isDirectory()) results.push(canonicalName);
+      } catch {
+        // no -/ dir
+      }
+    }
+  }
+  return results;
 }
 
 export async function rebuildPackuments(
@@ -166,30 +187,17 @@ export async function rebuildPackuments(
   const { root, baseUrl } = opts;
   const rebuilt: string[] = [];
 
-  // Find all encoded package dirs (e.g. "@concavetrillion%2fpd-ui")
-  const entries = await readdir(root);
-  const encodedDirs = entries.filter((e) => {
-    if (opts.packageName) {
-      return e === encodeScopedName(opts.packageName);
-    }
-    return e.startsWith("@") && e.includes("%2");
-  });
+  const packages = await findPackages(root, opts.packageName);
 
-  for (const encodedDir of encodedDirs) {
-    const canonicalName = decodeScopedName(encodedDir);
-    const tarballDir = join(root, encodedDir, "-");
+  for (const canonicalName of packages) {
+    const tarballDir = join(root, canonicalName, "-");
 
-    // Check the -/ subdirectory exists
     let tarballs: string[];
     try {
-      const s = await stat(tarballDir);
-      if (!s.isDirectory()) continue;
       tarballs = (await readdir(tarballDir)).filter((f) => f.endsWith(".tgz"));
     } catch {
-      // No -/ directory yet — skip
       continue;
     }
-
     if (tarballs.length === 0) continue;
 
     // Load existing packument to preserve time.created
@@ -206,10 +214,9 @@ export async function rebuildPackuments(
       delete existingVersionTimes["created"];
       delete existingVersionTimes["modified"];
     } catch {
-      // No existing packument — start fresh
+      // No existing packument
     }
 
-    // Parse each tarball
     const versionMeta: Record<string, PackumentVersion> = {};
     const versionTimes: Record<string, string> = {};
 
@@ -217,7 +224,6 @@ export async function rebuildPackuments(
       const tgzPath = join(tarballDir, tgzFile);
       const tgzBuffer = await readFile(tgzPath);
 
-      // Extract package.json from the tarball
       let pkgJson: Record<string, unknown>;
       try {
         pkgJson = await extractPackageJson(tgzBuffer);
@@ -230,11 +236,9 @@ export async function rebuildPackuments(
       const version = String(pkgJson["version"] ?? "");
       if (!version) continue;
 
-      // Compute hashes
       const shasum = createHash("sha1").update(tgzBuffer).digest("hex");
       const sha512 = createHash("sha512").update(tgzBuffer).digest("base64");
       const integrity = `sha512-${sha512}`;
-
       const tarball = tarballUrlFor(baseUrl, name, version);
 
       versionMeta[version] = {
@@ -245,7 +249,6 @@ export async function rebuildPackuments(
         dist: { tarball, shasum, integrity },
       };
 
-      // Preserve existing timestamp for this version, or use file mtime
       if (existingVersionTimes[version]) {
         versionTimes[version] = existingVersionTimes[version];
       } else {
@@ -256,23 +259,17 @@ export async function rebuildPackuments(
 
     if (Object.keys(versionMeta).length === 0) continue;
 
-    // Sort versions
     const sortedVersions = Object.keys(versionMeta).sort(semverCompare);
 
-    // Determine dist-tags
     const distTags: Record<string, string> = {};
-
-    // latest = highest non-prerelease, or highest overall if all are prereleases
     const stableVersions = sortedVersions.filter(
       (v) => !parseVersion(v).prerelease,
     );
-    if (stableVersions.length > 0) {
-      distTags["latest"] = stableVersions[stableVersions.length - 1];
-    } else {
-      distTags["latest"] = sortedVersions[sortedVersions.length - 1];
-    }
+    distTags["latest"] =
+      stableVersions.length > 0
+        ? stableVersions[stableVersions.length - 1]
+        : sortedVersions[sortedVersions.length - 1];
 
-    // Per-prerelease-tag dist-tags (e.g. "alpha" -> latest alpha version)
     const prereleasesByTag: Record<string, string[]> = {};
     for (const v of sortedVersions) {
       const parsed = parseVersion(v);
@@ -286,18 +283,15 @@ export async function rebuildPackuments(
       distTags[tag] = versions[versions.length - 1];
     }
 
-    // Build time object
     const now = new Date().toISOString();
-    const allTimes = { ...versionTimes };
-    const created = existingCreated ?? versionTimes[sortedVersions[0]] ?? now;
-
+    const created =
+      existingCreated ?? versionTimes[sortedVersions[0]] ?? now;
     const time: Record<string, string> = {
       created,
       modified: now,
-      ...allTimes,
+      ...versionTimes,
     };
 
-    // Build ordered versions object
     const versions: Record<string, PackumentVersion> = {};
     for (const v of sortedVersions) {
       versions[v] = versionMeta[v];
@@ -310,7 +304,6 @@ export async function rebuildPackuments(
       time,
     };
 
-    // Ensure the parent directory exists (should already exist as the encoded dir)
     await mkdir(dirname(packumentAbsPath), { recursive: true });
     await writeFile(packumentAbsPath, JSON.stringify(packument, null, 2), "utf8");
     rebuilt.push(canonicalName);
@@ -325,16 +318,15 @@ export async function rebuildPackuments(
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const args = process.argv.slice(2);
-  const rootIdx = args.indexOf("--root");
-  const baseUrlIdx = args.indexOf("--base-url");
-  const pkgIdx = args.indexOf("--package");
+  const idx = (flag: string) => args.indexOf(flag);
 
-  const root = rootIdx >= 0 ? args[rootIdx + 1] : process.cwd();
+  const root = idx("--root") >= 0 ? args[idx("--root") + 1] : process.cwd();
   const baseUrl =
-    baseUrlIdx >= 0
-      ? args[baseUrlIdx + 1]
+    idx("--base-url") >= 0
+      ? args[idx("--base-url") + 1]
       : "https://concavetrillion.github.io/pd-index-npm/";
-  const packageName = pkgIdx >= 0 ? args[pkgIdx + 1] : undefined;
+  const packageName =
+    idx("--package") >= 0 ? args[idx("--package") + 1] : undefined;
 
   rebuildPackuments({ root, baseUrl, packageName })
     .then(({ rebuilt }) => {

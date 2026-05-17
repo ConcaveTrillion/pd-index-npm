@@ -3,7 +3,7 @@
 #
 # Preconditions:
 #   - The smoke-test fixture @concavetrillion/test-package@0.0.1 has been
-#     published to the index (run Task 5's smoke-test once, manually).
+#     published to the index (via the publish.yml workflow).
 #   - You have curl, jq, and npm installed.
 #
 # What it does:
@@ -21,10 +21,13 @@ set -euo pipefail
 REGISTRY="${REGISTRY:-https://concavetrillion.github.io/pd-index-npm/}"
 PACKAGE="@concavetrillion/test-package"
 VERSION="0.0.1"
-ENC="@concavetrillion%2ftest-package"
+# GitHub Pages decodes %2f to / in the path, so we use the real slash form.
+PKG_PATH="@concavetrillion/test-package"
 
 echo "::group::Fetch + validate packument"
-PACKUMENT_URL="${REGISTRY}${ENC}/"
+# npm GETs /@concavetrillion%2ftest-package; Pages decodes to /@concavetrillion/test-package/
+# and serves index.html. We curl the decoded path directly.
+PACKUMENT_URL="${REGISTRY}${PKG_PATH}/"
 PACKUMENT=$(curl -fsSL "$PACKUMENT_URL")
 echo "$PACKUMENT" | jq -e '.name == "@concavetrillion/test-package"' >/dev/null
 echo "$PACKUMENT" | jq -e ".versions.\"$VERSION\".dist.tarball | startswith(\"https://\")" >/dev/null
