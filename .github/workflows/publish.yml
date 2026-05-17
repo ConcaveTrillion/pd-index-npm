@@ -1,0 +1,92 @@
+name: Publish package to pd-index-npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      tarball_url:
+        description: "URL to the .tgz to publish (typically a GitHub Release asset URL)"
+        required: true
+        type: string
+  repository_dispatch:
+    types: [pd-npm-publish]
+
+concurrency:
+  # Serialize all publishes; the gh-pages branch is mutated.
+  group: pd-index-npm-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: write        # to push to gh-pages
+  pages: write           # to deploy
+  id-token: write        # for the Pages deploy action
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main (tooling)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: tooling
+      - name: Checkout gh-pages (registry content)
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: registry
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Build tooling
+        working-directory: tooling
+        run: |
+          npm ci
+          npm run build
+      - name: Resolve tarball URL
+        id: url
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "url=${{ github.event.client_payload.tarball_url }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "url=${{ inputs.tarball_url }}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish
+        working-directory: tooling
+        env:
+          TARBALL_URL: ${{ steps.url.outputs.url }}
+          REGISTRY_ROOT: ${{ github.workspace }}/registry
+          BASE_URL: https://concavetrillion.github.io/pd-index-npm/
+        run: |
+          node dist/scripts/publish.js \
+            --tarball-url "$TARBALL_URL" \
+            --root        "$REGISTRY_ROOT" \
+            --base-url    "$BASE_URL"
+      - name: Commit + push gh-pages
+        working-directory: registry
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to commit; tarball was already present."
+            exit 0
+          fi
+          git commit -m "publish: ${{ steps.url.outputs.url }}"
+          git push origin gh-pages
+
+  smoke:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Wait for Pages to update
+        # Pages publish lag — empirically ~30-60s after gh-pages push
+        run: sleep 90
+      - name: Install jq
+        run: sudo apt-get install -y jq
+      - name: Run smoke test
+        run: bash tests/smoke/run.sh
