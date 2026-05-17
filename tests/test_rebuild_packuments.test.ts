@@ -1,0 +1,95 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp, writeFile, mkdir, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { rebuildPackuments } from "../scripts/rebuild-packuments.js";
+import { buildMinimalTarball } from "./_tar.js";
+
+const BASE_URL = "https://concavetrillion.github.io/pd-index-npm/";
+
+async function fixtureWithTarball(
+  pkgs: Array<{ name: string; version: string }>,
+): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), "pd-index-npm-"));
+  for (const pkg of pkgs) {
+    const encoded = pkg.name.replace("/", "%2f");
+    const tgzDir = join(root, encoded, "-");
+    await mkdir(tgzDir, { recursive: true });
+    const shortName = pkg.name.includes("/")
+      ? pkg.name.split("/")[1]
+      : pkg.name;
+    const tgzBytes = await buildMinimalTarball(pkg);
+    await writeFile(
+      join(tgzDir, `${shortName}-${pkg.version}.tgz`),
+      tgzBytes,
+    );
+  }
+  return root;
+}
+
+test("rebuildPackuments writes a valid packument JSON next to the tarball dir", async () => {
+  const root = await fixtureWithTarball([
+    { name: "@concavetrillion/test-package", version: "0.0.1" },
+  ]);
+  await rebuildPackuments({ root, baseUrl: BASE_URL });
+
+  // Packument is stored as @concavetrillion%2ftest-package/index.html
+  const packumentPath = join(root, "@concavetrillion%2ftest-package", "index.html");
+  const doc = JSON.parse(await readFile(packumentPath, "utf8")) as {
+    name: string;
+    "dist-tags": Record<string, string>;
+    versions: Record<
+      string,
+      { dist: { tarball: string; integrity: string; shasum: string } }
+    >;
+  };
+
+  assert.equal(doc.name, "@concavetrillion/test-package");
+  assert.equal(doc["dist-tags"].latest, "0.0.1");
+  assert.ok(doc.versions["0.0.1"]);
+  assert.match(
+    doc.versions["0.0.1"].dist.tarball,
+    /^https:\/\/concavetrillion\.github\.io\/pd-index-npm\/@concavetrillion%2ftest-package\/-\/test-package-0\.0\.1\.tgz$/,
+  );
+  assert.match(doc.versions["0.0.1"].dist.integrity, /^sha512-/);
+  assert.match(doc.versions["0.0.1"].dist.shasum, /^[0-9a-f]{40}$/);
+});
+
+test("rebuildPackuments merges multiple versions under one packument", async () => {
+  const root = await fixtureWithTarball([
+    { name: "@concavetrillion/test-package", version: "0.0.1" },
+    { name: "@concavetrillion/test-package", version: "0.0.2" },
+  ]);
+  await rebuildPackuments({ root, baseUrl: BASE_URL });
+
+  const packumentPath = join(root, "@concavetrillion%2ftest-package", "index.html");
+  const doc = JSON.parse(await readFile(packumentPath, "utf8")) as {
+    "dist-tags": Record<string, string>;
+    versions: Record<string, unknown>;
+    time: Record<string, string>;
+  };
+
+  assert.equal(doc["dist-tags"].latest, "0.0.2");
+  assert.ok(doc.versions["0.0.1"]);
+  assert.ok(doc.versions["0.0.2"]);
+  assert.ok(doc.time["created"]);
+  assert.ok(doc.time["modified"]);
+});
+
+test("rebuildPackuments respects prerelease ordering for dist-tags", async () => {
+  const root = await fixtureWithTarball([
+    { name: "@concavetrillion/test-package", version: "0.1.0-alpha.1" },
+    { name: "@concavetrillion/test-package", version: "0.1.0-alpha.2" },
+    { name: "@concavetrillion/test-package", version: "0.1.0" },
+  ]);
+  await rebuildPackuments({ root, baseUrl: BASE_URL });
+
+  const packumentPath = join(root, "@concavetrillion%2ftest-package", "index.html");
+  const doc = JSON.parse(await readFile(packumentPath, "utf8")) as {
+    "dist-tags": Record<string, string>;
+  };
+
+  assert.equal(doc["dist-tags"].latest, "0.1.0");
+  assert.equal(doc["dist-tags"].alpha, "0.1.0-alpha.2");
+});
