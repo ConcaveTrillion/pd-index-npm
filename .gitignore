@@ -1,0 +1,17 @@
+# Build output
+dist/
+_site/
+*.tgz
+
+# Node
+node_modules/
+.npm/
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Agent memory (per workspace convention; never tracked inside pd-* trees)
+.claude/
