@@ -63,8 +63,10 @@ export async function buildMinimalTarball(pkg: {
   version: string;
   description?: string;
   main?: string;
+  [key: string]: unknown;
 }): Promise<Buffer> {
   const pkgJson = JSON.stringify({
+    ...pkg,
     name: pkg.name,
     version: pkg.version,
     description: pkg.description ?? "Smoke test fixture",

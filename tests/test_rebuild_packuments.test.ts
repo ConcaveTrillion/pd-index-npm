@@ -9,7 +9,7 @@ import { buildMinimalTarball } from "./_tar.js";
 const BASE_URL = "https://concavetrillion.github.io/pd-index-npm/";
 
 async function fixtureWithTarball(
-  pkgs: Array<{ name: string; version: string }>,
+  pkgs: Array<{ name: string; version: string; [key: string]: unknown }>,
 ): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "pd-index-npm-"));
   for (const pkg of pkgs) {
@@ -92,4 +92,60 @@ test("rebuildPackuments respects prerelease ordering for dist-tags", async () =>
 
   assert.equal(doc["dist-tags"].latest, "0.1.0");
   assert.equal(doc["dist-tags"].alpha, "0.1.0-alpha.2");
+});
+
+test("rebuildPackuments preserves install-relevant metadata fields", async () => {
+  const root = await fixtureWithTarball([
+    {
+      name: "@concavetrillion/test-package",
+      version: "0.1.0-alpha",
+      dependencies: { konva: "^9.0.0", clsx: "^2.0.0" },
+      peerDependencies: { react: "^18.0.0" },
+      peerDependenciesMeta: { react: { optional: false } },
+      optionalDependencies: { fsevents: "^2.0.0" },
+      bundleDependencies: [],
+      engines: { node: ">=20" },
+      type: "module",
+      exports: { ".": { import: "./dist/index.js" } },
+      bin: { "test-cli": "./dist/cli.js" },
+      os: ["linux"],
+      cpu: ["x64"],
+      deprecated: false,
+    },
+  ]);
+  await rebuildPackuments({ root, baseUrl: BASE_URL });
+
+  const packumentPath = join(root, "@concavetrillion", "test-package", "index.html");
+  const doc = JSON.parse(await readFile(packumentPath, "utf8")) as {
+    versions: Record<string, Record<string, unknown>>;
+  };
+  const v = doc.versions["0.1.0-alpha"];
+
+  assert.deepEqual(v.dependencies, { konva: "^9.0.0", clsx: "^2.0.0" });
+  assert.deepEqual(v.peerDependencies, { react: "^18.0.0" });
+  assert.deepEqual(v.peerDependenciesMeta, { react: { optional: false } });
+  assert.deepEqual(v.optionalDependencies, { fsevents: "^2.0.0" });
+  assert.deepEqual(v.bundleDependencies, []);
+  assert.deepEqual(v.engines, { node: ">=20" });
+  assert.equal(v.type, "module");
+  assert.deepEqual(v.exports, { ".": { import: "./dist/index.js" } });
+  assert.deepEqual(v.bin, { "test-cli": "./dist/cli.js" });
+  assert.deepEqual(v.os, ["linux"]);
+  assert.deepEqual(v.cpu, ["x64"]);
+});
+
+test("rebuildPackuments omits absent metadata fields", async () => {
+  const root = await fixtureWithTarball([
+    { name: "@concavetrillion/test-package", version: "0.0.1" },
+  ]);
+  await rebuildPackuments({ root, baseUrl: BASE_URL });
+
+  const packumentPath = join(root, "@concavetrillion", "test-package", "index.html");
+  const doc = JSON.parse(await readFile(packumentPath, "utf8")) as {
+    versions: Record<string, Record<string, unknown>>;
+  };
+  const v = doc.versions["0.0.1"];
+
+  assert.equal("dependencies" in v, false);
+  assert.equal("peerDependencies" in v, false);
 });

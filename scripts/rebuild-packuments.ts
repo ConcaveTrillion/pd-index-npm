@@ -127,6 +127,48 @@ function semverCompare(a: string, b: string): number {
 }
 
 // ---------------------------------------------------------------------------
+// Install-relevant metadata
+// ---------------------------------------------------------------------------
+
+/**
+ * Fields a package manager needs from a packument version object to resolve
+ * a dependency tree. Omitting `dependencies` here is what previously caused
+ * `@concavetrillion/pd-ui` to install with no transitive deps fetched.
+ */
+const INSTALL_METADATA_KEYS = [
+  "dependencies",
+  "devDependencies",
+  "peerDependencies",
+  "peerDependenciesMeta",
+  "optionalDependencies",
+  "bundleDependencies",
+  "bundledDependencies",
+  "engines",
+  "exports",
+  "imports",
+  "type",
+  "bin",
+  "os",
+  "cpu",
+  "sideEffects",
+  "funding",
+  "deprecated",
+  "hasInstallScript",
+] as const;
+
+function pickInstallMetadata(
+  pkgJson: Record<string, unknown>,
+): Record<string, unknown> {
+  const picked: Record<string, unknown> = {};
+  for (const key of INSTALL_METADATA_KEYS) {
+    if (pkgJson[key] !== undefined) {
+      picked[key] = pkgJson[key];
+    }
+  }
+  return picked;
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -246,6 +288,7 @@ export async function rebuildPackuments(
         version,
         description: String(pkgJson["description"] ?? ""),
         main: String(pkgJson["main"] ?? "index.js"),
+        ...pickInstallMetadata(pkgJson),
         dist: { tarball, shasum, integrity },
       };
 

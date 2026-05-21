@@ -52,6 +52,11 @@ body as JSON (Content-Type is not checked against the body).
       "version": "0.1.0-alpha",
       "description": "...",
       "main": "dist/index.js",
+      "dependencies": { "konva": "^9.0.0", "...": "..." },
+      "peerDependencies": { "react": "^18.0.0", "react-dom": "^18.0.0" },
+      "engines": { "node": ">=20" },
+      "type": "module",
+      "exports": { ".": { "...": "..." } },
       "dist": {
         "tarball": "https://concavetrillion.github.io/pd-index-npm/@concavetrillion/pd-ui/-/pd-ui-0.1.0-alpha.tgz",
         "shasum": "<sha1 hex, 40 chars>",
@@ -71,6 +76,13 @@ body as JSON (Content-Type is not checked against the body).
 
 The `dist.tarball` URL uses the real slash form (not `%2f`) since GitHub Pages
 serves files by their actual on-disk path.
+
+Each version object also carries the install-relevant fields copied verbatim
+from the tarball's `package.json` — `dependencies`, `peerDependencies`,
+`peerDependenciesMeta`, `optionalDependencies`, `bundleDependencies`,
+`engines`, `exports`, `imports`, `type`, `bin`, `os`, `cpu`, `sideEffects`,
+`funding`, `deprecated`, `hasInstallScript`. Without these, a package manager
+reading the packument cannot resolve the transitive dependency tree.
 
 ## Upstream references
 
