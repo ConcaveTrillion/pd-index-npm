@@ -1,14 +1,14 @@
 /**
  * registry-layout.ts
  *
- * Types and constants describing the static on-disk layout of the pd-index-npm
+ * Types and constants describing the static on-disk layout of the pdomain-index-npm
  * registry (the shape the gh-pages branch must have for `npm install` to work).
  *
  * The layout uses actual slash-based directory structure (NOT %2f-encoded names):
  *
- *   @concavetrillion/test-package/                         <- directory
- *   @concavetrillion/test-package/index.html               <- packument JSON
- *   @concavetrillion/test-package/-/test-package-0.0.1.tgz <- tarball bytes
+ *   @pdomain/test-package/                         <- directory
+ *   @pdomain/test-package/index.html               <- packument JSON
+ *   @pdomain/test-package/-/test-package-0.0.1.tgz <- tarball bytes
  *
  * When npm GETs `/@concavetrillion%2ftest-package`, GitHub Pages decodes the
  * %2f to a real slash and serves the directory. GitHub Pages then serves
@@ -17,20 +17,20 @@
  * npm registries (used by skypack, esm.sh, etc.).
  *
  * Tarball URLs in the packument also use the decoded slash form so that GitHub
- * Pages can serve them directly: `.../pd-index-npm/@concavetrillion/test-package/-/test-package-0.0.1.tgz`
+ * Pages can serve them directly: `.../pdomain-index-npm/@pdomain/test-package/-/test-package-0.0.1.tgz`
  */
 
 /**
  * Returns the package directory name for the on-disk layout.
- * "@concavetrillion/pd-ui" -> "@concavetrillion/pd-ui"
+ * "@pdomain/pdomain-ui" -> "@pdomain/pdomain-ui"
  * (We use the actual slash — GitHub Pages decodes %2f, so we match that.)
  */
 export function packageDirFor(name: string): string {
-  return name; // e.g. "@concavetrillion/pd-ui"
+  return name; // e.g. "@pdomain/pdomain-ui"
 }
 
 /** Returns the tarball directory path relative to the registry root.
- *  "@concavetrillion/pd-ui" -> "@concavetrillion/pd-ui/-"
+ *  "@pdomain/pdomain-ui" -> "@pdomain/pdomain-ui/-"
  */
 export function tarballDirFor(name: string): string {
   return `${name}/-`;
@@ -41,7 +41,7 @@ export function tarballDirFor(name: string): string {
  * Packuments are stored as index.html so GitHub Pages serves them
  * when npm follows the redirect from /pkg to /pkg/.
  *
- * "@concavetrillion/pd-ui" -> "@concavetrillion/pd-ui/index.html"
+ * "@pdomain/pdomain-ui" -> "@pdomain/pdomain-ui/index.html"
  */
 export function packumentPathFor(name: string): string {
   return `${name}/index.html`;
@@ -51,10 +51,10 @@ export function packumentPathFor(name: string): string {
  * Constructs the absolute tarball URL for a given package + version.
  * Uses the decoded slash form so GitHub Pages can serve it directly.
  *
- * baseUrl = "https://concavetrillion.github.io/pd-index-npm/"
- * name    = "@concavetrillion/pd-ui"
+ * baseUrl = "https://concavetrillion.github.io/pdomain-index-npm/"
+ * name    = "@pdomain/pdomain-ui"
  * version = "0.1.0-alpha"
- * -> "https://concavetrillion.github.io/pd-index-npm/@concavetrillion/pd-ui/-/pd-ui-0.1.0-alpha.tgz"
+ * -> "https://concavetrillion.github.io/pdomain-index-npm/@pdomain/pdomain-ui/-/pdomain-ui-0.1.0-alpha.tgz"
  */
 export function tarballUrlFor(
   baseUrl: string,

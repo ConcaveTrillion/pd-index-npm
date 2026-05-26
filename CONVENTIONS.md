@@ -1,4 +1,4 @@
-# pd-index-npm conventions
+# pdomain-index-npm conventions
 
 <!-- workspace-conventions:start -->
 

@@ -133,7 +133,7 @@ function semverCompare(a: string, b: string): number {
 /**
  * Fields a package manager needs from a packument version object to resolve
  * a dependency tree. Omitting `dependencies` here is what previously caused
- * `@concavetrillion/pd-ui` to install with no transitive deps fetched.
+ * `@pdomain/pdomain-ui` to install with no transitive deps fetched.
  */
 const INSTALL_METADATA_KEYS = [
   "dependencies",
@@ -184,7 +184,7 @@ export interface RebuildResult {
 
 /**
  * Walk the registry root for scope directories (@...) and find packages.
- * Returns an array of canonical package names like "@concavetrillion/pd-ui".
+ * Returns an array of canonical package names like "@pdomain/pdomain-ui".
  */
 async function findPackages(root: string, filterName?: string): Promise<string[]> {
   const results: string[] = [];
@@ -367,7 +367,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const baseUrl =
     idx("--base-url") >= 0
       ? args[idx("--base-url") + 1]
-      : "https://concavetrillion.github.io/pd-index-npm/";
+      : "https://concavetrillion.github.io/pdomain-index-npm/";
   const packageName =
     idx("--package") >= 0 ? args[idx("--package") + 1] : undefined;
 

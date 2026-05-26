@@ -1,6 +1,6 @@
 # Registry Format
 
-This document describes the on-disk layout of the `pd-index-npm` static registry
+This document describes the on-disk layout of the `pdomain-index-npm` static registry
 (the shape of the `gh-pages` branch) and the parts of the npm registry HTTP API
 we serve.
 
@@ -9,12 +9,12 @@ we serve.
 ```
 /                                          # GitHub Pages root
   index.html                               # Human-readable landing page
-  @concavetrillion/                        # Scope directory
-    pd-ui/                                 # Package directory
+  @pdomain/                        # Scope directory
+    pdomain-ui/                                 # Package directory
       index.html                           # Packument JSON
       -/                                   # Tarball directory
-        pd-ui-0.1.0-alpha.tgz
-        pd-ui-0.1.1-alpha.tgz
+        pdomain-ui-0.1.0-alpha.tgz
+        pdomain-ui-0.1.1-alpha.tgz
     test-package/
       index.html                           # Packument JSON
       -/
@@ -23,32 +23,32 @@ we serve.
 
 ### Why real slashes (not `%2f`)
 
-The npm protocol uses URL-encoded scoped names: `GET /@concavetrillion%2fpd-ui`.
+The npm protocol uses URL-encoded scoped names: `GET /@concavetrillion%2fpdomain-ui`.
 GitHub Pages decodes `%2f` to a real `/` when matching paths, so a request for
-`/@concavetrillion%2fpd-ui/` is served from the directory
-`@concavetrillion/pd-ui/` on the `gh-pages` branch. This is the standard
+`/@concavetrillion%2fpdomain-ui/` is served from the directory
+`@pdomain/pdomain-ui/` on the `gh-pages` branch. This is the standard
 approach for GitHub Pages-hosted static npm registries.
 
 ### Packument files
 
 The packument (the JSON document npm GETs when resolving a package) is stored as
 `index.html` inside each package directory. GitHub Pages redirects `GET
-/@concavetrillion%2fpd-ui` → `/@concavetrillion/pd-ui/` and serves
-`@concavetrillion/pd-ui/index.html`. npm follows the redirect and parses the
+/@concavetrillion%2fpdomain-ui` → `/@pdomain/pdomain-ui/` and serves
+`@pdomain/pdomain-ui/index.html`. npm follows the redirect and parses the
 body as JSON (Content-Type is not checked against the body).
 
 ## Packument JSON shape
 
 ```json
 {
-  "name": "@concavetrillion/pd-ui",
+  "name": "@pdomain/pdomain-ui",
   "dist-tags": {
     "latest": "0.1.1-alpha",
     "alpha": "0.1.1-alpha"
   },
   "versions": {
     "0.1.0-alpha": {
-      "name": "@concavetrillion/pd-ui",
+      "name": "@pdomain/pdomain-ui",
       "version": "0.1.0-alpha",
       "description": "...",
       "main": "dist/index.js",
@@ -58,7 +58,7 @@ body as JSON (Content-Type is not checked against the body).
       "type": "module",
       "exports": { ".": { "...": "..." } },
       "dist": {
-        "tarball": "https://concavetrillion.github.io/pd-index-npm/@concavetrillion/pd-ui/-/pd-ui-0.1.0-alpha.tgz",
+        "tarball": "https://concavetrillion.github.io/pdomain-index-npm/@pdomain/pdomain-ui/-/pdomain-ui-0.1.0-alpha.tgz",
         "shasum": "<sha1 hex, 40 chars>",
         "integrity": "sha512-<base64>"
       }

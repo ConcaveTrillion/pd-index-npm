@@ -6,12 +6,12 @@ import { join } from "node:path";
 import { rebuildPackuments } from "../scripts/rebuild-packuments.js";
 import { buildMinimalTarball } from "./_tar.js";
 
-const BASE_URL = "https://concavetrillion.github.io/pd-index-npm/";
+const BASE_URL = "https://concavetrillion.github.io/pdomain-index-npm/";
 
 async function fixtureWithTarball(
   pkgs: Array<{ name: string; version: string; [key: string]: unknown }>,
 ): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "pd-index-npm-"));
+  const root = await mkdtemp(join(tmpdir(), "pdomain-index-npm-"));
   for (const pkg of pkgs) {
     // Use real slash directory structure (not %2f encoded)
     const tgzDir = join(root, pkg.name, "-");
@@ -30,11 +30,11 @@ async function fixtureWithTarball(
 
 test("rebuildPackuments writes a valid packument JSON next to the tarball dir", async () => {
   const root = await fixtureWithTarball([
-    { name: "@concavetrillion/test-package", version: "0.0.1" },
+    { name: "@pdomain/test-package", version: "0.0.1" },
   ]);
   await rebuildPackuments({ root, baseUrl: BASE_URL });
 
-  // Packument is stored as @concavetrillion/test-package/index.html
+  // Packument is stored as @pdomain/test-package/index.html
   const packumentPath = join(root, "@concavetrillion", "test-package", "index.html");
   const doc = JSON.parse(await readFile(packumentPath, "utf8")) as {
     name: string;
@@ -45,12 +45,12 @@ test("rebuildPackuments writes a valid packument JSON next to the tarball dir", 
     >;
   };
 
-  assert.equal(doc.name, "@concavetrillion/test-package");
+  assert.equal(doc.name, "@pdomain/test-package");
   assert.equal(doc["dist-tags"].latest, "0.0.1");
   assert.ok(doc.versions["0.0.1"]);
   assert.match(
     doc.versions["0.0.1"].dist.tarball,
-    /^https:\/\/concavetrillion\.github\.io\/pd-index-npm\/@concavetrillion\/test-package\/-\/test-package-0\.0\.1\.tgz$/,
+    /^https:\/\/concavetrillion\.github\.io\/pdomain-index-npm\/@concavetrillion\/test-package\/-\/test-package-0\.0\.1\.tgz$/,
   );
   assert.match(doc.versions["0.0.1"].dist.integrity, /^sha512-/);
   assert.match(doc.versions["0.0.1"].dist.shasum, /^[0-9a-f]{40}$/);
@@ -58,8 +58,8 @@ test("rebuildPackuments writes a valid packument JSON next to the tarball dir", 
 
 test("rebuildPackuments merges multiple versions under one packument", async () => {
   const root = await fixtureWithTarball([
-    { name: "@concavetrillion/test-package", version: "0.0.1" },
-    { name: "@concavetrillion/test-package", version: "0.0.2" },
+    { name: "@pdomain/test-package", version: "0.0.1" },
+    { name: "@pdomain/test-package", version: "0.0.2" },
   ]);
   await rebuildPackuments({ root, baseUrl: BASE_URL });
 
@@ -79,9 +79,9 @@ test("rebuildPackuments merges multiple versions under one packument", async () 
 
 test("rebuildPackuments respects prerelease ordering for dist-tags", async () => {
   const root = await fixtureWithTarball([
-    { name: "@concavetrillion/test-package", version: "0.1.0-alpha.1" },
-    { name: "@concavetrillion/test-package", version: "0.1.0-alpha.2" },
-    { name: "@concavetrillion/test-package", version: "0.1.0" },
+    { name: "@pdomain/test-package", version: "0.1.0-alpha.1" },
+    { name: "@pdomain/test-package", version: "0.1.0-alpha.2" },
+    { name: "@pdomain/test-package", version: "0.1.0" },
   ]);
   await rebuildPackuments({ root, baseUrl: BASE_URL });
 
@@ -97,7 +97,7 @@ test("rebuildPackuments respects prerelease ordering for dist-tags", async () =>
 test("rebuildPackuments preserves install-relevant metadata fields", async () => {
   const root = await fixtureWithTarball([
     {
-      name: "@concavetrillion/test-package",
+      name: "@pdomain/test-package",
       version: "0.1.0-alpha",
       dependencies: { konva: "^9.0.0", clsx: "^2.0.0" },
       peerDependencies: { react: "^18.0.0" },
@@ -136,7 +136,7 @@ test("rebuildPackuments preserves install-relevant metadata fields", async () =>
 
 test("rebuildPackuments omits absent metadata fields", async () => {
   const root = await fixtureWithTarball([
-    { name: "@concavetrillion/test-package", version: "0.0.1" },
+    { name: "@pdomain/test-package", version: "0.0.1" },
   ]);
   await rebuildPackuments({ root, baseUrl: BASE_URL });
 

@@ -9,7 +9,7 @@ import { publish, PublishConflictError } from "../scripts/publish.js";
 import { buildMinimalTarball } from "./_tar.js";
 
 async function makeRoot(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "pd-index-npm-pub-"));
+  return mkdtemp(join(tmpdir(), "pdomain-index-npm-pub-"));
 }
 
 function startFileServer(
@@ -36,32 +36,32 @@ function startFileServer(
 test("publish drops the tarball into the right encoded path", async () => {
   const root = await makeRoot();
   const tarballBytes = await buildMinimalTarball({
-    name: "@concavetrillion/pd-ui",
+    name: "@pdomain/pdomain-ui",
     version: "0.1.0-alpha",
   });
-  const localTarball = join(root, "_input", "pd-ui-0.1.0-alpha.tgz");
+  const localTarball = join(root, "_input", "pdomain-ui-0.1.0-alpha.tgz");
   await mkdir(join(root, "_input"), { recursive: true });
   await writeFile(localTarball, tarballBytes);
 
   const result = await publish({
     root,
     tarballPath: localTarball,
-    baseUrl: "https://concavetrillion.github.io/pd-index-npm/",
+    baseUrl: "https://concavetrillion.github.io/pdomain-index-npm/",
   });
 
-  assert.equal(result.packageName, "@concavetrillion/pd-ui");
+  assert.equal(result.packageName, "@pdomain/pdomain-ui");
   assert.equal(result.version, "0.1.0-alpha");
 
   // Tarball at rest: uses real slash path
   const tgzAtRest = await readFile(
-    join(root, "@concavetrillion", "pd-ui", "-", "pd-ui-0.1.0-alpha.tgz"),
+    join(root, "@concavetrillion", "pdomain-ui", "-", "pdomain-ui-0.1.0-alpha.tgz"),
   );
   assert.equal(tgzAtRest.byteLength, tarballBytes.byteLength);
 
   // Packument at index.html
   const packument = JSON.parse(
     await readFile(
-      join(root, "@concavetrillion", "pd-ui", "index.html"),
+      join(root, "@concavetrillion", "pdomain-ui", "index.html"),
       "utf8",
     ),
   ) as {
@@ -76,25 +76,25 @@ test("publish refuses to overwrite an existing version with different bytes", as
   const root = await makeRoot();
 
   const tarball1 = await buildMinimalTarball({
-    name: "@concavetrillion/pd-ui",
+    name: "@pdomain/pdomain-ui",
     version: "0.1.0",
     description: "original",
   });
-  const f1 = join(root, "_input1", "pd-ui-0.1.0.tgz");
+  const f1 = join(root, "_input1", "pdomain-ui-0.1.0.tgz");
   await mkdir(join(root, "_input1"), { recursive: true });
   await writeFile(f1, tarball1);
   await publish({
     root,
     tarballPath: f1,
-    baseUrl: "https://concavetrillion.github.io/pd-index-npm/",
+    baseUrl: "https://concavetrillion.github.io/pdomain-index-npm/",
   });
 
   const tarball2 = await buildMinimalTarball({
-    name: "@concavetrillion/pd-ui",
+    name: "@pdomain/pdomain-ui",
     version: "0.1.0",
     description: "different content",
   });
-  const f2 = join(root, "_input2", "pd-ui-0.1.0.tgz");
+  const f2 = join(root, "_input2", "pdomain-ui-0.1.0.tgz");
   await mkdir(join(root, "_input2"), { recursive: true });
   await writeFile(f2, tarball2);
 
@@ -103,7 +103,7 @@ test("publish refuses to overwrite an existing version with different bytes", as
       publish({
         root,
         tarballPath: f2,
-        baseUrl: "https://concavetrillion.github.io/pd-index-npm/",
+        baseUrl: "https://concavetrillion.github.io/pdomain-index-npm/",
       }),
     (err: unknown) => {
       assert.ok(err instanceof PublishConflictError);
@@ -116,7 +116,7 @@ test("publish refuses to overwrite an existing version with different bytes", as
 test("publish accepts a URL for the tarball, downloads it, then publishes", async () => {
   const root = await makeRoot();
   const tarballBytes = await buildMinimalTarball({
-    name: "@concavetrillion/test-package",
+    name: "@pdomain/test-package",
     version: "0.0.1",
   });
 
@@ -128,10 +128,10 @@ test("publish accepts a URL for the tarball, downloads it, then publishes", asyn
     const result = await publish({
       root,
       tarballUrl: `${baseUrl}/test-package-0.0.1.tgz`,
-      baseUrl: "https://concavetrillion.github.io/pd-index-npm/",
+      baseUrl: "https://concavetrillion.github.io/pdomain-index-npm/",
     });
 
-    assert.equal(result.packageName, "@concavetrillion/test-package");
+    assert.equal(result.packageName, "@pdomain/test-package");
     assert.equal(result.version, "0.0.1");
 
     const tgzAtRest = await readFile(

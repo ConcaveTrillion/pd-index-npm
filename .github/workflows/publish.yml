@@ -1,4 +1,4 @@
-name: Publish package to pd-index-npm
+name: Publish package to pdomain-index-npm
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ on:
 
 concurrency:
   # Serialize all publishes; the gh-pages branch is mutated.
-  group: pd-index-npm-publish
+  group: pdomain-index-npm-publish
   cancel-in-progress: false
 
 permissions:
@@ -56,7 +56,7 @@ jobs:
         env:
           TARBALL_URL: ${{ steps.url.outputs.url }}
           REGISTRY_ROOT: ${{ github.workspace }}/registry
-          BASE_URL: https://concavetrillion.github.io/pd-index-npm/
+          BASE_URL: https://concavetrillion.github.io/pdomain-index-npm/
         run: |
           node dist/scripts/publish.js \
             --tarball-url "$TARBALL_URL" \

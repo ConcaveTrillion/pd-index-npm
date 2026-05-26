@@ -1,7 +1,7 @@
 /**
  * publish.ts
  *
- * Publishes a single .tgz tarball into the pd-index-npm static registry.
+ * Publishes a single .tgz tarball into the pdomain-index-npm static registry.
  *
  * Algorithm:
  *   1. If tarballUrl given, download via Node 20 native fetch().
@@ -41,7 +41,7 @@ export interface PublishOptions {
   tarballPath?: string;
   /** URL to download the .tgz from. Mutually exclusive with tarballPath. */
   tarballUrl?: string;
-  /** Registry base URL, e.g. "https://concavetrillion.github.io/pd-index-npm/" */
+  /** Registry base URL, e.g. "https://concavetrillion.github.io/pdomain-index-npm/" */
   baseUrl: string;
 }
 
@@ -231,7 +231,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const baseUrl =
     idx("--base-url") >= 0
       ? args[idx("--base-url") + 1]
-      : "https://concavetrillion.github.io/pd-index-npm/";
+      : "https://concavetrillion.github.io/pdomain-index-npm/";
   const tarballPath =
     idx("--tarball") >= 0 ? args[idx("--tarball") + 1] : undefined;
   const tarballUrl =

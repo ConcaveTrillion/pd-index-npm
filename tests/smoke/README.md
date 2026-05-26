@@ -1,7 +1,7 @@
 # Smoke Test
 
-The `run.sh` script is the end-to-end integration test for `pd-index-npm`. It
-proves that `npm install` can resolve a `@concavetrillion/*` package from the
+The `run.sh` script is the end-to-end integration test for `pdomain-index-npm`. It
+proves that `npm install` can resolve a `@pdomain/*` package from the
 static registry exactly as it would from npmjs.org.
 
 ## What the smoke proves
@@ -18,7 +18,7 @@ This is the only test that exercises the full round-trip (GitHub Pages HTTP
 
 ## Preconditions
 
-The `@concavetrillion/test-package@0.0.1` package must already be published to
+The `@pdomain/test-package@0.0.1` package must already be published to
 the index. This happens automatically when the `publish.yml` workflow runs with
 the smoke-test fixture tarball (the Task 5 manual trigger), and subsequently in
 CI after every publish.

@@ -75,7 +75,7 @@ export async function buildMinimalTarball(pkg: {
   const pkgJsonBuf = Buffer.from(pkgJson, "utf8");
 
   // index.js content
-  const indexJs = `module.exports = 'pd-index-npm smoke ok';`;
+  const indexJs = `module.exports = 'pdomain-index-npm smoke ok';`;
   const indexJsBuf = Buffer.from(indexJs, "utf8");
 
   // Build tar: two files — package/package.json and package/index.js

@@ -1,6 +1,6 @@
-# pd-index-npm
+# pdomain-index-npm
 
-Agent guidance for the `pd-index-npm` repo.
+Agent guidance for the `pdomain-index-npm` repo.
 
 <!-- workspace-process:start -->
 

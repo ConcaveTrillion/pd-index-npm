@@ -1,14 +1,14 @@
-# pd-index-npm
+# pdomain-index-npm
 
 Self-hosted [npm registry](https://github.com/npm/registry/blob/main/docs/REGISTRY-API.md)
-for the `@concavetrillion/*` scope, served as a static site from GitHub
+for the `@pdomain/*` scope, served as a static site from GitHub
 Pages. The npm sibling of the existing [`pd-index`](https://github.com/ConcaveTrillion/pd-index)
 (pip).
 
 ## URL
 
 ```
-https://concavetrillion.github.io/pd-index-npm/
+https://concavetrillion.github.io/pdomain-index-npm/
 ```
 
 ## How consumers use it
@@ -16,13 +16,13 @@ https://concavetrillion.github.io/pd-index-npm/
 Add to your project's `.npmrc`:
 
 ```
-@concavetrillion:registry=https://concavetrillion.github.io/pd-index-npm/
+@pdomain:registry=https://concavetrillion.github.io/pdomain-index-npm/
 ```
 
 Then:
 
 ```sh
-npm install @concavetrillion/pd-ui
+npm install @pdomain/pdomain-ui
 ```
 
 Resolves through the static registry. Every other package continues to
@@ -36,9 +36,9 @@ with a `client_payload.tarball_url` pointing at the `.tgz` (typically a
 GitHub Release asset URL on the publisher's own repo):
 
 ```sh
-gh api repos/ConcaveTrillion/pd-index-npm/dispatches \
+gh api repos/ConcaveTrillion/pdomain-index-npm/dispatches \
   -f event_type=pd-npm-publish \
-  -f client_payload[tarball_url]="https://github.com/ConcaveTrillion/pd-ui/releases/download/v0.1.0-alpha/pd-ui-0.1.0-alpha.tgz"
+  -f client_payload[tarball_url]="https://github.com/ConcaveTrillion/pdomain-ui/releases/download/v0.1.0-alpha/pdomain-ui-0.1.0-alpha.tgz"
 ```
 
 The publish workflow downloads the tarball, computes integrity + shasum,
@@ -65,7 +65,7 @@ Same answer as the pip side. The index speaks the same wire protocol
 npmjs does, so migration later is `npm publish` + dropping the `.npmrc`
 line. No package-shape changes required.
 
-The `@concavetrillion/*` packages already follow habits to keep that door
+The `@pdomain/*` packages already follow habits to keep that door
 open:
 - Plain semver version strings (no npm-specific metadata in the version).
 - Release versions are immutable (same `name@version` with different bytes
