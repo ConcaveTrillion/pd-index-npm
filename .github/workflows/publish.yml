@@ -84,8 +84,20 @@ jobs:
         with:
           node-version: "20"
       - name: Wait for Pages to update
-        # Pages publish lag — empirically ~30-60s after gh-pages push
-        run: sleep 90
+        # Pages publish lag — usually ~30-60s, occasionally >90s. Poll with backoff.
+        env:
+          PACKUMENT_URL: https://pdomain.github.io/pdomain-index-npm/@pdomain/test-package/
+        run: |
+          for i in 1 2 3 4 5; do
+            if curl -fsSL "$PACKUMENT_URL" | grep -q '"name":"@pdomain/test-package"'; then
+              echo "Pages live after attempt $i"
+              exit 0
+            fi
+            echo "Attempt $i: packument not yet live; sleeping 30s"
+            sleep 30
+          done
+          echo "Pages did not become available after 5 attempts (150s total)" >&2
+          exit 1
       - name: Install jq
         run: sudo apt-get install -y jq
       - name: Run smoke test
