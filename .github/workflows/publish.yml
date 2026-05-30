@@ -16,33 +16,36 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  contents: write        # to push to gh-pages
-  pages: write           # to deploy
-  id-token: write        # for the Pages deploy action
+  contents: write # to push to gh-pages
+  pages: write # to deploy
+  id-token: write # for the Pages deploy action
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main (tooling)
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: main
           path: tooling
       - name: Checkout gh-pages (registry content)
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: gh-pages
           path: registry
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "20"
+          node-version: "24"
       - name: Build tooling
         working-directory: tooling
         run: |
-          npm ci
-          npm run build
+          make setup
+          make ci
       - name: Resolve tarball URL
         id: url
         run: |
@@ -58,10 +61,10 @@ jobs:
           REGISTRY_ROOT: ${{ github.workspace }}/registry
           BASE_URL: https://pdomain.github.io/pdomain-index-npm/
         run: |
-          node dist/scripts/publish.js \
-            --tarball-url "$TARBALL_URL" \
-            --root        "$REGISTRY_ROOT" \
-            --base-url    "$BASE_URL"
+          make publish-pkg \
+            TARBALL_URL="$TARBALL_URL" \
+            ROOT="$REGISTRY_ROOT" \
+            BASE_URL="$BASE_URL"
       - name: Commit + push gh-pages
         working-directory: registry
         run: |
@@ -79,10 +82,12 @@ jobs:
     needs: publish
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          node-version: "20"
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
       - name: Wait for Pages to update
         # Pages publish lag — usually ~30-60s, occasionally >90s. Poll with backoff.
         env:
@@ -101,4 +106,4 @@ jobs:
       - name: Install jq
         run: sudo apt-get install -y jq
       - name: Run smoke test
-        run: bash tests/smoke/run.sh
+        run: make smoke

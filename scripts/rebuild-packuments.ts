@@ -101,8 +101,7 @@ function parseVersion(v: string): ParsedVersion {
   if (!match) throw new Error(`Invalid semver: ${v}`);
   const prerelease = match[4] ?? "";
   const prereleaseTag =
-    prerelease.split(".")[0].replace(/\d+$/, "") ||
-    prerelease.split(".")[0];
+    prerelease.split(".")[0].replace(/\d+$/, "") || prerelease.split(".")[0];
   return {
     major: parseInt(match[1], 10),
     minor: parseInt(match[2], 10),
@@ -168,6 +167,10 @@ function pickInstallMetadata(
   return picked;
 }
 
+function stringField(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -186,7 +189,10 @@ export interface RebuildResult {
  * Walk the registry root for scope directories (@...) and find packages.
  * Returns an array of canonical package names like "@pdomain/pdomain-ui".
  */
-async function findPackages(root: string, filterName?: string): Promise<string[]> {
+async function findPackages(
+  root: string,
+  filterName?: string,
+): Promise<string[]> {
   const results: string[] = [];
   let scopeDirs: string[];
   try {
@@ -274,8 +280,8 @@ export async function rebuildPackuments(
         continue;
       }
 
-      const name = String(pkgJson["name"] ?? canonicalName);
-      const version = String(pkgJson["version"] ?? "");
+      const name = stringField(pkgJson["name"], canonicalName);
+      const version = stringField(pkgJson["version"]);
       if (!version) continue;
 
       const shasum = createHash("sha1").update(tgzBuffer).digest("hex");
@@ -286,8 +292,8 @@ export async function rebuildPackuments(
       versionMeta[version] = {
         name,
         version,
-        description: String(pkgJson["description"] ?? ""),
-        main: String(pkgJson["main"] ?? "index.js"),
+        description: stringField(pkgJson["description"]),
+        main: stringField(pkgJson["main"], "index.js"),
         ...pickInstallMetadata(pkgJson),
         dist: { tarball, shasum, integrity },
       };
@@ -327,8 +333,7 @@ export async function rebuildPackuments(
     }
 
     const now = new Date().toISOString();
-    const created =
-      existingCreated ?? versionTimes[sortedVersions[0]] ?? now;
+    const created = existingCreated ?? versionTimes[sortedVersions[0]] ?? now;
     const time: Record<string, string> = {
       created,
       modified: now,
@@ -348,7 +353,11 @@ export async function rebuildPackuments(
     };
 
     await mkdir(dirname(packumentAbsPath), { recursive: true });
-    await writeFile(packumentAbsPath, JSON.stringify(packument, null, 2), "utf8");
+    await writeFile(
+      packumentAbsPath,
+      JSON.stringify(packument, null, 2),
+      "utf8",
+    );
     rebuilt.push(canonicalName);
   }
 

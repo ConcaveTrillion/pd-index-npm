@@ -20,10 +20,7 @@ async function fixtureWithTarball(
       ? pkg.name.split("/")[1]
       : pkg.name;
     const tgzBytes = await buildMinimalTarball(pkg);
-    await writeFile(
-      join(tgzDir, `${shortName}-${pkg.version}.tgz`),
-      tgzBytes,
-    );
+    await writeFile(join(tgzDir, `${shortName}-${pkg.version}.tgz`), tgzBytes);
   }
   return root;
 }
@@ -35,7 +32,7 @@ test("rebuildPackuments writes a valid packument JSON next to the tarball dir", 
   await rebuildPackuments({ root, baseUrl: BASE_URL });
 
   // Packument is stored as @pdomain/test-package/index.html
-  const packumentPath = join(root, "@concavetrillion", "test-package", "index.html");
+  const packumentPath = join(root, "@pdomain", "test-package", "index.html");
   const doc = JSON.parse(await readFile(packumentPath, "utf8")) as {
     name: string;
     "dist-tags": Record<string, string>;
@@ -50,7 +47,7 @@ test("rebuildPackuments writes a valid packument JSON next to the tarball dir", 
   assert.ok(doc.versions["0.0.1"]);
   assert.match(
     doc.versions["0.0.1"].dist.tarball,
-    /^https:\/\/concavetrillion\.github\.io\/pdomain-index-npm\/@concavetrillion\/test-package\/-\/test-package-0\.0\.1\.tgz$/,
+    /^https:\/\/pdomain\.github\.io\/pdomain-index-npm\/@pdomain\/test-package\/-\/test-package-0\.0\.1\.tgz$/,
   );
   assert.match(doc.versions["0.0.1"].dist.integrity, /^sha512-/);
   assert.match(doc.versions["0.0.1"].dist.shasum, /^[0-9a-f]{40}$/);
@@ -63,7 +60,7 @@ test("rebuildPackuments merges multiple versions under one packument", async () 
   ]);
   await rebuildPackuments({ root, baseUrl: BASE_URL });
 
-  const packumentPath = join(root, "@concavetrillion", "test-package", "index.html");
+  const packumentPath = join(root, "@pdomain", "test-package", "index.html");
   const doc = JSON.parse(await readFile(packumentPath, "utf8")) as {
     "dist-tags": Record<string, string>;
     versions: Record<string, unknown>;
@@ -85,7 +82,7 @@ test("rebuildPackuments respects prerelease ordering for dist-tags", async () =>
   ]);
   await rebuildPackuments({ root, baseUrl: BASE_URL });
 
-  const packumentPath = join(root, "@concavetrillion", "test-package", "index.html");
+  const packumentPath = join(root, "@pdomain", "test-package", "index.html");
   const doc = JSON.parse(await readFile(packumentPath, "utf8")) as {
     "dist-tags": Record<string, string>;
   };
@@ -115,7 +112,7 @@ test("rebuildPackuments preserves install-relevant metadata fields", async () =>
   ]);
   await rebuildPackuments({ root, baseUrl: BASE_URL });
 
-  const packumentPath = join(root, "@concavetrillion", "test-package", "index.html");
+  const packumentPath = join(root, "@pdomain", "test-package", "index.html");
   const doc = JSON.parse(await readFile(packumentPath, "utf8")) as {
     versions: Record<string, Record<string, unknown>>;
   };
@@ -140,7 +137,7 @@ test("rebuildPackuments omits absent metadata fields", async () => {
   ]);
   await rebuildPackuments({ root, baseUrl: BASE_URL });
 
-  const packumentPath = join(root, "@concavetrillion", "test-package", "index.html");
+  const packumentPath = join(root, "@pdomain", "test-package", "index.html");
   const doc = JSON.parse(await readFile(packumentPath, "utf8")) as {
     versions: Record<string, Record<string, unknown>>;
   };

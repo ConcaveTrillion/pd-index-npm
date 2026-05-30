@@ -45,6 +45,10 @@ The publish workflow downloads the tarball, computes integrity + shasum,
 writes it to the `gh-pages` branch, updates the package's packument, and
 commits. GitHub Pages picks up the new content within ~60s.
 
+The dispatch path is the fast path. A daily GitHub Actions sync also scans
+publisher GitHub Releases for `.tgz` assets and republishes them idempotently,
+so the registry catches up if a publisher dispatch is missed.
+
 ## Versioning conventions
 
 - Semver throughout.
@@ -67,6 +71,7 @@ line. No package-shape changes required.
 
 The `@pdomain/*` packages already follow habits to keep that door
 open:
+
 - Plain semver version strings (no npm-specific metadata in the version).
 - Release versions are immutable (same `name@version` with different bytes
   is rejected).

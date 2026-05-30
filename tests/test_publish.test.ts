@@ -54,16 +54,13 @@ test("publish drops the tarball into the right encoded path", async () => {
 
   // Tarball at rest: uses real slash path
   const tgzAtRest = await readFile(
-    join(root, "@concavetrillion", "pdomain-ui", "-", "pdomain-ui-0.1.0-alpha.tgz"),
+    join(root, "@pdomain", "pdomain-ui", "-", "pdomain-ui-0.1.0-alpha.tgz"),
   );
   assert.equal(tgzAtRest.byteLength, tarballBytes.byteLength);
 
   // Packument at index.html
   const packument = JSON.parse(
-    await readFile(
-      join(root, "@concavetrillion", "pdomain-ui", "index.html"),
-      "utf8",
-    ),
+    await readFile(join(root, "@pdomain", "pdomain-ui", "index.html"), "utf8"),
   ) as {
     "dist-tags": Record<string, string>;
     versions: Record<string, unknown>;
@@ -135,7 +132,7 @@ test("publish accepts a URL for the tarball, downloads it, then publishes", asyn
     assert.equal(result.version, "0.0.1");
 
     const tgzAtRest = await readFile(
-      join(root, "@concavetrillion", "test-package", "-", "test-package-0.0.1.tgz"),
+      join(root, "@pdomain", "test-package", "-", "test-package-0.0.1.tgz"),
     );
     assert.equal(tgzAtRest.byteLength, tarballBytes.byteLength);
   } finally {

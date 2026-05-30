@@ -18,15 +18,15 @@
  */
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { join, dirname } from "node:path";
+import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { createGunzip } from "node:zlib";
 import { Readable } from "node:stream";
+import { tarballDirFor, packumentPathFor } from "./registry-layout.js";
 import {
-  tarballDirFor,
-  packumentPathFor,
-} from "./registry-layout.js";
-import { rebuildPackuments, type RebuildOptions } from "./rebuild-packuments.js";
+  rebuildPackuments,
+  type RebuildOptions,
+} from "./rebuild-packuments.js";
 
 export type { RebuildOptions };
 
@@ -41,6 +41,8 @@ export interface PublishOptions {
   tarballPath?: string;
   /** URL to download the .tgz from. Mutually exclusive with tarballPath. */
   tarballUrl?: string;
+  /** Optional guard used by release-sync jobs to avoid indexing legacy packages. */
+  expectedPackageName?: string;
   /** Registry base URL, e.g. "https://pdomain.github.io/pdomain-index-npm/" */
   baseUrl: string;
 }
@@ -59,6 +61,20 @@ export class PublishConflictError extends Error {
         `npm versions are immutable. To fix a release, publish a new version.`,
     );
     this.name = "PublishConflictError";
+  }
+}
+
+export class UnexpectedPackageNameError extends Error {
+  actualPackageName: string;
+  expectedPackageName: string;
+
+  constructor(actualPackageName: string, expectedPackageName: string) {
+    super(
+      `Tarball package name ${actualPackageName} does not match expected package ${expectedPackageName}.`,
+    );
+    this.name = "UnexpectedPackageNameError";
+    this.actualPackageName = actualPackageName;
+    this.expectedPackageName = expectedPackageName;
   }
 }
 
@@ -115,6 +131,10 @@ async function extractPackageJson(
   return JSON.parse(entry.data.toString("utf8")) as Record<string, unknown>;
 }
 
+function stringField(value: unknown, fallback = ""): string {
+  return typeof value === "string" ? value : fallback;
+}
+
 // ---------------------------------------------------------------------------
 // Download helper
 // ---------------------------------------------------------------------------
@@ -149,12 +169,15 @@ export async function publish(opts: PublishOptions): Promise<PublishResult> {
 
   // Step 2: Parse package.json from tarball
   const pkgJson = await extractPackageJson(tgzBuffer);
-  const packageName = String(pkgJson["name"] ?? "");
-  const version = String(pkgJson["version"] ?? "");
+  const packageName = stringField(pkgJson["name"]);
+  const version = stringField(pkgJson["version"]);
   if (!packageName || !version) {
     throw new Error(
       "Tarball's package.json is missing 'name' or 'version' fields",
     );
+  }
+  if (opts.expectedPackageName && packageName !== opts.expectedPackageName) {
+    throw new UnexpectedPackageNameError(packageName, opts.expectedPackageName);
   }
 
   // Step 3: Compute hashes
@@ -164,9 +187,7 @@ export async function publish(opts: PublishOptions): Promise<PublishResult> {
   // Packument is at <root>/@scope/name/index.html
   const packumentAbsPath = join(root, packumentPathFor(packageName));
   try {
-    const existing = JSON.parse(
-      await readFile(packumentAbsPath, "utf8"),
-    ) as {
+    const existing = JSON.parse(await readFile(packumentAbsPath, "utf8")) as {
       versions?: Record<string, { dist?: { shasum?: string } }>;
     };
     const existingVersion = existing.versions?.[version];

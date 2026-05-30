@@ -11,17 +11,15 @@ static registry exactly as it would from npmjs.org.
 2. The tarball the packument points at is a valid gzipped tar containing
    `package/package.json` — i.e., the npm wire format.
 3. A fresh directory with only the `.npmrc` registry override can `npm install`
-   the package, and `require()`-ing the result returns the expected value.
+   the package, and the installed `package.json` has the expected name/version.
 
 This is the only test that exercises the full round-trip (GitHub Pages HTTP
-→ npm CLI → Node.js `require()`).
+→ npm CLI → installed package metadata).
 
 ## Preconditions
 
-The `@pdomain/test-package@0.0.1` package must already be published to
-the index. This happens automatically when the `publish.yml` workflow runs with
-the smoke-test fixture tarball (the Task 5 manual trigger), and subsequently in
-CI after every publish.
+The `@pdomain/pdomain-ui` package must have at least one version published to
+the index.
 
 ## How to run locally
 
@@ -46,5 +44,5 @@ REGISTRY=http://localhost:8000/ bash tests/smoke/run.sh
 | `curl` 404 on packument URL | Pages not yet serving the package | Wait 60-120s after a publish; check `gh-pages` branch has the files |
 | `curl` 404 on tarball URL | Tarball missing from `gh-pages` | Re-run the publish workflow |
 | `npm install` fails with 404 | Packument's `dist.tarball` URL wrong | Check `baseUrl` in the publish workflow env var |
-| `require()` returns wrong string | `index.js` in the test package was changed | Rebuild and re-publish the smoke fixture |
+| Installed package metadata differs | Packument points at the wrong tarball or stale content | Re-run the publish/sync workflow |
 | Smoke flakes in CI | Pages lag > 90s | Increase the `sleep` in `publish.yml`'s smoke job |

@@ -1,0 +1,88 @@
+name: Sync GitHub Release tarballs
+
+# Daily safety net for pdomain-index-npm.
+#
+# The fast path is repository_dispatch type=pd-npm-publish from publisher repos.
+# This workflow mirrors pdomain-index-pip's daily cron: scan publisher GitHub
+# Releases for npm tarball assets, publish any missing tarballs into gh-pages,
+# and let the static registry converge even if a dispatch was missed.
+#
+# Read-only public GitHub API access is enough to list release assets. The
+# default GITHUB_TOKEN is used for rate limits; publisher repos can still use an
+# org-level dispatch secret for the immediate publish path.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/sync-releases.ts"
+      - "scripts/publish.ts"
+      - "scripts/rebuild-packuments.ts"
+      - "scripts/registry-layout.ts"
+      - ".github/workflows/sync-releases.yml"
+
+concurrency:
+  group: pdomain-index-npm-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main (tooling)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: main
+          path: tooling
+
+      - name: Checkout gh-pages (registry content)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: gh-pages
+          path: registry
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "24"
+
+      - name: Build tooling
+        working-directory: tooling
+        run: |
+          make setup
+          make ci
+
+      - name: Sync release tarballs
+        working-directory: tooling
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_ROOT: ${{ github.workspace }}/registry
+          BASE_URL: https://pdomain.github.io/pdomain-index-npm/
+        run: |
+          make sync-releases \
+            ROOT="$REGISTRY_ROOT" \
+            BASE_URL="$BASE_URL"
+
+      - name: Commit + push gh-pages
+        working-directory: registry
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to commit; registry already matches release assets."
+            exit 0
+          fi
+          git commit -m "sync: GitHub Release tarballs"
+          git push origin gh-pages
