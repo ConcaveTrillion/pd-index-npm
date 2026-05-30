@@ -19,7 +19,7 @@
     "lint": "eslint .",
     "format:check": "prettier --check \"scripts/**/*.{ts,mjs}\" \"tests/**/*.ts\" \".github/workflows/*.{yml,yaml}\" \"*.{json,js}\" \"README.md\" \"CONVENTIONS.md\" \"docs/**/*.md\" \"tests/**/*.md\"",
     "actionlint": "node scripts/actionlint.mjs",
-    "shell:check": "bash -n tests/smoke/run.sh",
+    "shell:check": "bash -n scripts/do-release.sh scripts/release-common.sh tests/smoke/run.sh",
     "static-check": "npm run typecheck && npm run lint && npm run format:check && npm run actionlint && npm run shell:check",
     "ci": "npm run static-check && npm test",
     "publish-pkg": "npm run build --silent && node dist/scripts/publish.js",

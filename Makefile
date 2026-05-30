@@ -1,7 +1,7 @@
 # pdomain-index-npm — static npm registry tooling
 # Usage: make <target>
 
-.PHONY: help setup install typecheck lint lint-check format-check actionlint shell-check static-check pre-commit-check test build ci ci-slow publish-pkg rebuild-packuments sync-releases smoke
+.PHONY: help setup install typecheck lint lint-check format-check actionlint shell-check static-check pre-commit-check test build ci ci-slow release-patch release-minor release-major _do-release publish-pkg rebuild-packuments sync-releases smoke
 
 BASE_URL ?= https://pdomain.github.io/pdomain-index-npm/
 ROOT ?= $(CURDIR)
@@ -48,6 +48,23 @@ ci: ## Run complete CI pipeline (static-check and test)
 	npm run ci
 
 ci-slow: ci ## Full pre-flight for releases (alias of ci today)
+
+release-patch: ## Release: bump patch, run ci-slow, tag, push (fires GitHub Release workflow; e.g. v0.1.0 -> v0.1.1)
+	@$(MAKE) --no-print-directory _do-release BUMP=patch
+
+release-minor: ## Release: bump minor, run ci-slow, tag, push (fires GitHub Release workflow; e.g. v0.1.0 -> v0.2.0)
+	@$(MAKE) --no-print-directory _do-release BUMP=minor
+
+release-major: ## Release: bump major, run ci-slow, tag, push (fires GitHub Release workflow; e.g. v0.1.0 -> v1.0.0)
+	@$(MAKE) --no-print-directory _do-release BUMP=major
+
+# scripts/do-release.sh handles repo-state guards, runs the ci-slow pre-flight,
+# computes the next three-component tag from the latest v* tag, creates the
+# annotated tag, and pushes main + tag to origin.
+# Pass FORCE=1 to skip repo-state guards (pre-flight still runs).
+# Pass SKIP_PUSH=1 to create the release commit/tag locally without pushing.
+_do-release:
+	@BUMP=$(or $(BUMP),minor) ./scripts/do-release.sh
 
 publish-pkg: ## Publish a tarball into ROOT (set TARBALL=path or TARBALL_URL=url, optional EXPECTED_PACKAGE_NAME=name)
 	@if [ -z "$(TARBALL)" ] && [ -z "$(TARBALL_URL)" ]; then \
