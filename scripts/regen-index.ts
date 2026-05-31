@@ -415,6 +415,28 @@ function buildPackument(
   };
 }
 
+function addIndexedVersion(
+  byPackage: Map<string, IndexedVersion[]>,
+  indexed: IndexedVersion,
+): boolean {
+  const versions = byPackage.get(indexed.packageName) ?? [];
+  const existing = versions.find(
+    (candidate) => candidate.version === indexed.version,
+  );
+  if (existing) {
+    if (existing.meta.dist.shasum !== indexed.meta.dist.shasum) {
+      throw new Error(
+        `${indexed.packageName}@${indexed.version} already appeared with different content`,
+      );
+    }
+    return false;
+  }
+
+  versions.push(indexed);
+  byPackage.set(indexed.packageName, versions);
+  return true;
+}
+
 export async function regenIndex(
   opts: RegenIndexOptions,
 ): Promise<RegenIndexResult> {
@@ -455,10 +477,9 @@ export async function regenIndex(
         );
         continue;
       }
-      const versions = byPackage.get(indexed.packageName) ?? [];
-      versions.push(indexed);
-      byPackage.set(indexed.packageName, versions);
-      published.push(`${indexed.packageName}@${indexed.version}`);
+      if (addIndexedVersion(byPackage, indexed)) {
+        published.push(`${indexed.packageName}@${indexed.version}`);
+      }
     }
   }
 
