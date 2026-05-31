@@ -45,8 +45,7 @@ after creating a release asset to signal immediate regeneration:
 
 ```sh
 gh api repos/pdomain/pdomain-index-npm/dispatches \
-  -f event_type=pd-npm-publish \
-  -f client_payload[tarball_url]="https://github.com/pdomain/pdomain-ui/releases/download/v0.1.0-alpha/pdomain-ui-0.1.0-alpha.tgz"
+  -f event_type=pd-npm-publish
 ```
 
 The dispatch path is the fast path. A daily GitHub Actions sync also scans
@@ -59,8 +58,8 @@ idempotently, so the registry catches up if a publisher dispatch is missed.
 - Pre-1.0 incubation: `0.X.Y-alpha[.N]`. The `alpha` dist-tag tracks the
   latest prerelease; `latest` only advances when a non-prerelease is
   published.
-- Versions are immutable. Republishing the same `name@version` with
-  different tarball bytes is rejected by `scripts/publish.ts`.
+- Versions are immutable. `scripts/regen-index.ts` rejects duplicate
+  `name@version` release assets with different tarball bytes.
 
 ## Layout
 
