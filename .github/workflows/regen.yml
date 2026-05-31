@@ -1,9 +1,10 @@
-name: Regenerate npm index
+name: regen-and-deploy
 
 on:
   schedule:
     - cron: "17 3 * * *"
   workflow_dispatch:
+  workflow_call:
   repository_dispatch:
     types: [pd-npm-publish]
 
