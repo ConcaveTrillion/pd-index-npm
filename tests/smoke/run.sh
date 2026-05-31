@@ -41,7 +41,7 @@ if [ -z "$VERSION" ]; then
   VERSION=$(echo "$PACKUMENT" | jq -r '."dist-tags".latest')
 fi
 test -n "$VERSION" && test "$VERSION" != "null"
-echo "$PACKUMENT" | jq -e --arg version "$VERSION" '.versions[$version].dist.tarball | test("^https?://")' >/dev/null
+echo "$PACKUMENT" | jq -e --arg version "$VERSION" '.versions[$version].dist.tarball | test("^https://github[.]com/pdomain/pdomain-ui/releases/download/.+[.]tgz$")' >/dev/null
 TARBALL_URL=$(echo "$PACKUMENT" | jq -r --arg version "$VERSION" '.versions[$version].dist.tarball')
 echo "OK: packument shape valid; tarball URL = $TARBALL_URL"
 echo "::endgroup::"

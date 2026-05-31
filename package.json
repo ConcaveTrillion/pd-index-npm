@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Build tooling for the pdomain-index-npm static registry. The published artifacts live under gh-pages, not in this package.",
+  "description": "Build tooling for the pdomain-index-npm static registry. GitHub Pages hosts generated packuments, while tarballs live in publisher GitHub Releases.",
   "author": "CT <concavetrillion@gmail.com>",
   "license": "MIT",
   "repository": {
@@ -24,6 +24,7 @@
     "ci": "npm run static-check && npm test",
     "publish-pkg": "npm run build --silent && node dist/scripts/publish.js",
     "rebuild-packuments": "npm run build --silent && node dist/scripts/rebuild-packuments.js",
+    "regen-index": "npm run build --silent && node dist/scripts/regen-index.js",
     "sync-releases": "npm run build --silent && node dist/scripts/sync-releases.js",
     "smoke": "bash tests/smoke/run.sh",
     "test": "npm run build --silent && node --test --test-reporter=spec dist/tests/*.test.js dist/tests/**/*.test.js"

@@ -1,10 +1,11 @@
 # pdomain-index-npm — static npm registry tooling
 # Usage: make <target>
 
-.PHONY: help setup install typecheck lint lint-check format-check actionlint shell-check static-check pre-commit-check test build ci ci-slow release-patch release-minor release-major _do-release publish-pkg rebuild-packuments sync-releases smoke
+.PHONY: help setup install typecheck lint lint-check format-check actionlint shell-check static-check pre-commit-check test build ci ci-slow release-patch release-minor release-major _do-release publish-pkg rebuild-packuments regen-index sync-releases smoke
 
 BASE_URL ?= https://pdomain.github.io/pdomain-index-npm/
 ROOT ?= $(CURDIR)
+REGEN_ROOT ?= _site
 EXPECTED_PACKAGE_NAME ?=
 
 help: ## Show this help message
@@ -79,6 +80,9 @@ publish-pkg: ## Publish a tarball into ROOT (set TARBALL=path or TARBALL_URL=url
 
 rebuild-packuments: ## Rebuild packuments under ROOT
 	npm run rebuild-packuments -- --root "$(ROOT)" --base-url "$(BASE_URL)"
+
+regen-index: ## Regenerate the static registry into REGEN_ROOT without copying tarballs
+	npm run regen-index -- --root "$(REGEN_ROOT)"
 
 sync-releases: ## Sync GitHub Release tarballs into ROOT
 	npm run sync-releases -- --root "$(ROOT)" --base-url "$(BASE_URL)"

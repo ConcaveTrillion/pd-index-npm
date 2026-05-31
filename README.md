@@ -31,23 +31,26 @@ resolve from npmjs.org. The registry is **read-only and unauthenticated**
 
 ## How publishers push to it
 
-Publisher repos trigger a `repository_dispatch` of type `pd-npm-publish`
-with a `client_payload.tarball_url` pointing at the `.tgz` (typically a
-GitHub Release asset URL on the publisher's own repo):
+Publisher repos create `.tgz` files as GitHub Release assets. The
+`pdomain-index-npm` deploy workflow scans allowlisted publisher releases,
+validates each package tarball, computes integrity metadata, and regenerates
+the static packuments served by GitHub Pages.
+
+GitHub Pages hosts packuments only. New package tarballs are fetched directly
+from the publisher repository's GitHub Release assets. Historical Pages-hosted
+tarball URLs are not a compatibility promise.
+
+Publisher repos can trigger a `repository_dispatch` of type `pd-npm-publish`
+after creating a release asset to signal immediate regeneration:
 
 ```sh
 gh api repos/pdomain/pdomain-index-npm/dispatches \
-  -f event_type=pd-npm-publish \
-  -f client_payload[tarball_url]="https://github.com/pdomain/pdomain-ui/releases/download/v0.1.0-alpha/pdomain-ui-0.1.0-alpha.tgz"
+  -f event_type=pd-npm-publish
 ```
 
-The publish workflow downloads the tarball, computes integrity + shasum,
-writes it to the `gh-pages` branch, updates the package's packument, and
-commits. GitHub Pages picks up the new content within ~60s.
-
 The dispatch path is the fast path. A daily GitHub Actions sync also scans
-publisher GitHub Releases for `.tgz` assets and republishes them idempotently,
-so the registry catches up if a publisher dispatch is missed.
+publisher GitHub Releases for `.tgz` assets and regenerates the registry
+idempotently, so the registry catches up if a publisher dispatch is missed.
 
 ## Versioning conventions
 
@@ -55,8 +58,8 @@ so the registry catches up if a publisher dispatch is missed.
 - Pre-1.0 incubation: `0.X.Y-alpha[.N]`. The `alpha` dist-tag tracks the
   latest prerelease; `latest` only advances when a non-prerelease is
   published.
-- Versions are immutable. Republishing the same `name@version` with
-  different tarball bytes is rejected by `scripts/publish.ts`.
+- Versions are immutable. `scripts/regen-index.ts` rejects duplicate
+  `name@version` release assets with different tarball bytes.
 
 ## Layout
 
