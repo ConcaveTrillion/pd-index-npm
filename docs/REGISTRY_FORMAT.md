@@ -1,7 +1,7 @@
 # Registry Format
 
-This document describes the on-disk layout of the `pdomain-index-npm` static registry
-(the shape of the `gh-pages` branch) and the parts of the npm registry HTTP API
+This document describes the generated GitHub Pages artifact for the
+`pdomain-index-npm` static registry and the parts of the npm registry HTTP API
 we serve.
 
 ## Directory layout
@@ -12,22 +12,21 @@ we serve.
   @pdomain/                        # Scope directory
     pdomain-ui/                                 # Package directory
       index.html                           # Packument JSON
-      -/                                   # Tarball directory
-        pdomain-ui-0.1.0-alpha.tgz
-        pdomain-ui-0.1.1-alpha.tgz
     test-package/
       index.html                           # Packument JSON
-      -/
-        test-package-0.0.1.tgz
 ```
+
+Tarball bytes are not stored in the Pages artifact for new versions. The
+packument's `dist.tarball` field points at the publisher repository's GitHub
+Release asset URL, and npm downloads the tarball from GitHub Releases.
 
 ### Why real slashes (not `%2f`)
 
 The npm protocol uses URL-encoded scoped names: `GET /@pdomain%2fpdomain-ui`.
 GitHub Pages decodes `%2f` to a real `/` when matching paths, so a request for
-`/@pdomain%2fpdomain-ui/` is served from the directory `@pdomain/pdomain-ui/`
-on the `gh-pages` branch. This is the standard approach for GitHub
-Pages-hosted static npm registries.
+`/@pdomain%2fpdomain-ui/` is served from the generated directory
+`@pdomain/pdomain-ui/`. This is the standard approach for GitHub Pages-hosted
+static npm registries.
 
 ### Packument files
 
@@ -58,7 +57,7 @@ as JSON (Content-Type is not checked against the body).
       "type": "module",
       "exports": { ".": { "...": "..." } },
       "dist": {
-        "tarball": "https://pdomain.github.io/pdomain-index-npm/@pdomain/pdomain-ui/-/pdomain-ui-0.1.0-alpha.tgz",
+        "tarball": "https://github.com/pdomain/pdomain-ui/releases/download/v0.1.0-alpha/pdomain-ui-0.1.0-alpha.tgz",
         "shasum": "<sha1 hex, 40 chars>",
         "integrity": "sha512-<base64>"
       }
@@ -74,8 +73,9 @@ as JSON (Content-Type is not checked against the body).
 }
 ```
 
-The `dist.tarball` URL uses the real slash form (not `%2f`) since GitHub Pages
-serves files by their actual on-disk path.
+The `dist.tarball` URL is the publisher repository's GitHub Release asset URL.
+The registry stores hashes in the packument, but it does not copy the tarball
+into the Pages artifact.
 
 Each version object also carries the install-relevant fields copied verbatim
 from the tarball's `package.json` — `dependencies`, `peerDependencies`,
@@ -92,18 +92,20 @@ reading the packument cannot resolve the transitive dependency tree.
 
 ## Intentional simplifications
 
-- **No `_attachments`**: Tarballs are served as static files (not embedded as base64
-  in the packument).
-- **No `_rev`**: The publish workflow owns all mutations to `gh-pages`.
+- **No `_attachments`**: Tarballs are referenced by URL, not embedded as base64
+  in the packument.
+- **No `_rev`**: The deploy workflow regenerates packuments from allowlisted
+  GitHub Release assets.
 - **No PUT semantics**: The registry is read-only from the consumer's perspective.
 - **No `npm login`**: The registry is unauthenticated. All packages are public.
 
 ## Trust model
 
-Tarballs are submitted to the publish workflow as URLs. The `scripts/publish.ts`
-script downloads the tarball, computes SHA-1 (`shasum`) and SHA-512 (`integrity`)
-hashes, and writes both into the packument. Publishers never compute hashes
-themselves — the publish script is the single source of truth for integrity data.
+Tarballs are discovered from allowlisted publisher GitHub Releases. The
+`scripts/regen-index.ts` script downloads each tarball, validates package
+metadata, computes SHA-1 (`shasum`) and SHA-512 (`integrity`) hashes, and writes
+both into the packument. Publishers never compute hashes themselves; the
+regeneration script is the single source of truth for integrity data.
 
 ## dist-tags conventions
 
