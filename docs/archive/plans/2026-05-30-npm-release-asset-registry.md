@@ -1,5 +1,10 @@
 # npm Release Asset Registry Implementation Plan
 
+> Archived historical implementation plan. The shipped registry format is
+> maintained in [`docs/REGISTRY_FORMAT.md`](../../REGISTRY_FORMAT.md). Legacy
+> publish, rebuild, and sync scripts referenced during migration were removed
+> after the release-asset registry shipped.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Regenerate the static npm registry from allowlisted GitHub Release tarball assets, host only packuments on Pages, and deploy through the official Pages artifact flow.

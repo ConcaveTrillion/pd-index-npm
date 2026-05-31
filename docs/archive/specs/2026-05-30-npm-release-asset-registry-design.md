@@ -1,5 +1,10 @@
 # npm Release Asset Registry Design
 
+> Archived historical design. The implemented registry format is maintained in
+> [`docs/REGISTRY_FORMAT.md`](../../REGISTRY_FORMAT.md). Legacy publish,
+> rebuild, and sync scripts referenced by the migration were removed after the
+> release-asset registry shipped.
+
 ## Context
 
 `pdomain-index-npm` is a static npm registry for the `@pdomain/*` scope. It

@@ -162,10 +162,7 @@ function parseTarEntries(buf: Buffer, maxPackageJsonBytes: number): TarEntry[] {
     const typeFlag = header[156];
     offset += 512;
     if (typeFlag === 0 || typeFlag === 48) {
-      if (
-        (name === "package/package.json" || name.endsWith("/package.json")) &&
-        size > maxPackageJsonBytes
-      ) {
+      if (name === "package/package.json" && size > maxPackageJsonBytes) {
         throw maxBytesError("Tarball package.json", maxPackageJsonBytes);
       }
       entries.push({ name, size, data: buf.subarray(offset, offset + size) });
@@ -186,8 +183,7 @@ async function extractPackageJson(
     "Tarball decompressed data",
   );
   const entry = parseTarEntries(gunzipped, maxPackageJsonBytes).find(
-    (e) =>
-      e.name === "package/package.json" || e.name.endsWith("/package.json"),
+    (e) => e.name === "package/package.json",
   );
   if (!entry) throw new Error("No package/package.json found in tarball");
   return JSON.parse(entry.data.toString("utf8")) as Record<string, unknown>;
@@ -245,8 +241,27 @@ function semverCompare(a: string, b: string): number {
   if (pa.patch !== pb.patch) return pa.patch - pb.patch;
   if (!pa.prerelease && pb.prerelease) return 1;
   if (pa.prerelease && !pb.prerelease) return -1;
-  if (pa.prerelease < pb.prerelease) return -1;
-  if (pa.prerelease > pb.prerelease) return 1;
+  return prereleaseCompare(pa.prerelease, pb.prerelease);
+}
+
+function prereleaseCompare(a: string, b: string): number {
+  const aParts = a.split(".");
+  const bParts = b.split(".");
+  const length = Math.max(aParts.length, bParts.length);
+  for (let i = 0; i < length; i++) {
+    const aPart = aParts[i];
+    const bPart = bParts[i];
+    if (aPart === undefined) return -1;
+    if (bPart === undefined) return 1;
+    if (aPart === bPart) continue;
+
+    const aNumeric = /^\d+$/.test(aPart);
+    const bNumeric = /^\d+$/.test(bPart);
+    if (aNumeric && bNumeric) return Number(aPart) - Number(bPart);
+    if (aNumeric) return -1;
+    if (bNumeric) return 1;
+    return aPart < bPart ? -1 : 1;
+  }
   return 0;
 }
 
@@ -460,7 +475,10 @@ function addIndexedVersion(
     (candidate) => candidate.version === indexed.version,
   );
   if (existing) {
-    if (existing.meta.dist.shasum !== indexed.meta.dist.shasum) {
+    if (
+      existing.meta.dist.shasum !== indexed.meta.dist.shasum ||
+      existing.meta.dist.integrity !== indexed.meta.dist.integrity
+    ) {
       throw new Error(
         `${indexed.packageName}@${indexed.version} already appeared with different content`,
       );

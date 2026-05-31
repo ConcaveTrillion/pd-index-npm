@@ -7,7 +7,10 @@ import type { Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { regenIndex } from "../scripts/regen-index.js";
-import { buildMinimalTarball } from "./_tar.js";
+import {
+  buildMinimalTarball,
+  buildTarballWithPackageJsonEntries,
+} from "./_tar.js";
 
 type GithubFixtureReleases = unknown[] | ((page: number) => unknown[]);
 
@@ -297,6 +300,56 @@ test("regenIndex skips release assets with the wrong package name", async () => 
   }
 });
 
+test("regenIndex reads only the canonical package/package.json entry", async () => {
+  const root = await makeRoot();
+  const tarball = await buildTarballWithPackageJsonEntries([
+    {
+      path: "not-package/package.json",
+      pkg: {
+        name: "@pdomain/pdomain-ui",
+        version: "0.4.2",
+      },
+    },
+    {
+      path: "package/package.json",
+      pkg: {
+        name: "@pdomain/wrong-package",
+        version: "0.4.2",
+      },
+    },
+  ]);
+
+  const releases: unknown[] = [];
+  const { server, baseUrl } = await startGithubFixture(releases, {
+    "/assets/pdomain-ui-0.4.2.tgz": tarball,
+  });
+  releases.push({
+    tag_name: "v0.4.2",
+    assets: [
+      {
+        name: "pdomain-ui-0.4.2.tgz",
+        browser_download_url: `${baseUrl}/assets/pdomain-ui-0.4.2.tgz`,
+      },
+    ],
+  });
+
+  try {
+    const result = await regenIndex({
+      root,
+      githubApiBaseUrl: baseUrl,
+      repos: ["pdomain/pdomain-ui"],
+      allowNonGithubAssetHostsForTests: true,
+    });
+
+    assert.deepEqual(result.generated, []);
+    assert.deepEqual(result.published, []);
+    assert.equal(result.skipped.length, 1);
+    assert.match(result.skipped[0], /@pdomain\/wrong-package/);
+  } finally {
+    server.close();
+  }
+});
+
 test("regenIndex skips production release asset URLs from a different GitHub repo", async () => {
   const root = await makeRoot();
   const tarball = await buildMinimalTarball({
@@ -448,6 +501,57 @@ test("regenIndex selects stable latest and prerelease dist-tags", async () => {
     ) as { "dist-tags": Record<string, string> };
     assert.equal(packument["dist-tags"].latest, "0.5.0");
     assert.equal(packument["dist-tags"].alpha, "0.5.0-alpha.2");
+  } finally {
+    server.close();
+  }
+});
+
+test("regenIndex sorts numeric prerelease identifiers by semver precedence", async () => {
+  const root = await makeRoot();
+  const alpha2 = await buildMinimalTarball({
+    name: "@pdomain/pdomain-ui",
+    version: "1.0.0-alpha.2",
+  });
+  const alpha10 = await buildMinimalTarball({
+    name: "@pdomain/pdomain-ui",
+    version: "1.0.0-alpha.10",
+  });
+
+  const releases: unknown[] = [];
+  const { server, baseUrl } = await startGithubFixture(releases, {
+    "/assets/pdomain-ui-1.0.0-alpha.2.tgz": alpha2,
+    "/assets/pdomain-ui-1.0.0-alpha.10.tgz": alpha10,
+  });
+  releases.push({
+    tag_name: "v1.0.0-alpha",
+    assets: [
+      {
+        name: "pdomain-ui-1.0.0-alpha.2.tgz",
+        browser_download_url: `${baseUrl}/assets/pdomain-ui-1.0.0-alpha.2.tgz`,
+      },
+      {
+        name: "pdomain-ui-1.0.0-alpha.10.tgz",
+        browser_download_url: `${baseUrl}/assets/pdomain-ui-1.0.0-alpha.10.tgz`,
+      },
+    ],
+  });
+
+  try {
+    await regenIndex({
+      root,
+      githubApiBaseUrl: baseUrl,
+      repos: ["pdomain/pdomain-ui"],
+      allowNonGithubAssetHostsForTests: true,
+    });
+
+    const packument = JSON.parse(
+      await readFile(
+        join(root, "@pdomain", "pdomain-ui", "index.html"),
+        "utf8",
+      ),
+    ) as { "dist-tags": Record<string, string> };
+    assert.equal(packument["dist-tags"].latest, "1.0.0-alpha.10");
+    assert.equal(packument["dist-tags"].alpha, "1.0.0-alpha.10");
   } finally {
     server.close();
   }

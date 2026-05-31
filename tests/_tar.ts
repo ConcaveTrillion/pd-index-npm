@@ -57,6 +57,11 @@ function padTo512(buf: Buffer): Buffer {
   return Buffer.concat([buf, padding]);
 }
 
+async function gzipTarParts(parts: Buffer[]): Promise<Buffer> {
+  parts.push(Buffer.alloc(1024, 0));
+  return gzipAsync(Buffer.concat(parts));
+}
+
 /** Build a minimal .tgz with the given package.json content. */
 export async function buildMinimalTarball(pkg: {
   name: string;
@@ -89,10 +94,33 @@ export async function buildMinimalTarball(pkg: {
   parts.push(makeTarHeader("package/index.js", indexJsBuf.length));
   parts.push(padTo512(indexJsBuf));
 
-  // End-of-archive: two zero blocks
-  parts.push(Buffer.alloc(1024, 0));
+  return gzipTarParts(parts);
+}
 
-  const tarBuf = Buffer.concat(parts);
-  const tgzBuf = await gzipAsync(tarBuf);
-  return tgzBuf;
+export async function buildTarballWithPackageJsonEntries(
+  entries: Array<{
+    path: string;
+    pkg: {
+      name: string;
+      version: string;
+      description?: string;
+      main?: string;
+      [key: string]: unknown;
+    };
+  }>,
+): Promise<Buffer> {
+  const parts: Buffer[] = [];
+  for (const entry of entries) {
+    const pkgJson = JSON.stringify({
+      ...entry.pkg,
+      name: entry.pkg.name,
+      version: entry.pkg.version,
+      description: entry.pkg.description ?? "Smoke test fixture",
+      main: entry.pkg.main ?? "index.js",
+    });
+    const pkgJsonBuf = Buffer.from(pkgJson, "utf8");
+    parts.push(makeTarHeader(entry.path, pkgJsonBuf.length));
+    parts.push(padTo512(pkgJsonBuf));
+  }
+  return gzipTarParts(parts);
 }
