@@ -513,7 +513,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       if (result.published.length === 0) {
         console.log("No npm release tarballs found.");
       } else {
-        console.log(`Indexed packages: ${result.generated.join(", ")}`);
+        console.log(`Indexed packages: ${result.published.join(", ")}`);
       }
       console.log(`Skipped release assets: ${result.skipped.length}`);
     })
