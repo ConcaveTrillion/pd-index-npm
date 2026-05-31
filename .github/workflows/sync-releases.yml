@@ -1,100 +1,66 @@
-name: Sync GitHub Release tarballs
-
-# Daily safety net for pdomain-index-npm.
-#
-# The fast path is repository_dispatch type=pd-npm-publish from publisher repos.
-# This workflow mirrors pdomain-index-pip's daily cron: scan publisher GitHub
-# Releases for npm tarball assets, publish any missing tarballs into gh-pages,
-# and let the static registry converge even if a dispatch was missed.
-#
-# Read-only public GitHub API access is enough to list release assets. Publisher
-# repos can still use an org-level dispatch secret for the immediate publish
-# path.
+name: Regenerate npm index
 
 on:
   schedule:
     - cron: "17 3 * * *"
   workflow_dispatch:
+  repository_dispatch:
+    types: [pd-npm-publish]
 
 concurrency:
-  group: pdomain-index-npm-publish
+  group: pdomain-index-npm-pages
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
-  sync:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout main (tooling)
+      - name: Checkout tooling
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: main
-          path: tooling
-          persist-credentials: false
-
-      - name: Checkout gh-pages (registry content)
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          ref: gh-pages
-          path: registry
           persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: "24"
+          cache: "npm"
 
-      - name: Build tooling
-        working-directory: tooling
-        run: |
-          make setup
-          make ci
+      - name: Install dependencies
+        run: make setup
 
-      - name: Sync release tarballs
-        working-directory: tooling
-        env:
-          REGISTRY_ROOT: ${{ github.workspace }}/registry
-          BASE_URL: https://pdomain.github.io/pdomain-index-npm/
-        run: |
-          make sync-releases \
-            ROOT="$REGISTRY_ROOT" \
-            BASE_URL="$BASE_URL"
+      - name: Run CI
+        run: make ci
 
-      - name: Commit gh-pages
-        id: commit
-        working-directory: registry
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if git diff --staged --quiet; then
-            echo "No changes to commit; registry already matches release assets."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          git commit -m "sync: GitHub Release tarballs"
-          echo "changed=true" >> "$GITHUB_OUTPUT"
-
-      - name: Push gh-pages
-        if: steps.commit.outputs.changed == 'true'
-        working-directory: registry
+      - name: Regenerate index
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          askpass=$(mktemp)
-          trap 'rm -f "$askpass"' EXIT
-          cat > "$askpass" <<'EOF'
-          #!/bin/sh
-          case "$1" in
-            *Username*) printf '%s\n' x-access-token ;;
-            *) printf '%s\n' "$GITHUB_TOKEN" ;;
-          esac
-          EOF
-          chmod 700 "$askpass"
-          GIT_ASKPASS="$askpass" GIT_TERMINAL_PROMPT=0 \
-            git push "https://github.com/${GITHUB_REPOSITORY}.git" HEAD:gh-pages
+        run: make regen-index ROOT="${{ github.workspace }}/_site"
+
+      - name: Configure Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
