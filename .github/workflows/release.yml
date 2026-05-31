@@ -3,6 +3,8 @@ name: release
 # Dispatch-only release. scripts/do-release.sh pushes the exact tag after
 # local ci-slow passes, then triggers this workflow with the tag input below.
 # The pre-release CI gate runs the regular make-ci ingredients in parallel.
+# After publishing the GitHub Release, this workflow dispatches an npm index
+# regeneration so the Pages registry is rebuilt with the released tooling.
 on:
   workflow_dispatch:
     inputs:
@@ -76,3 +78,15 @@ jobs:
             --title "$TAG_NAME" \
             --generate-notes \
             --verify-tag
+
+      - name: Dispatch npm index regeneration
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.event.inputs.tag }}
+        run: |
+          gh api \
+            --method POST \
+            "repos/${GITHUB_REPOSITORY}/dispatches" \
+            --field event_type=pd-npm-publish \
+            --field "client_payload[released_repository]=${GITHUB_REPOSITORY}" \
+            --field "client_payload[released_tag]=${TAG_NAME}"

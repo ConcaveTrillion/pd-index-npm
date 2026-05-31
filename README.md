@@ -52,6 +52,10 @@ The dispatch path is the fast path. A daily GitHub Actions sync also scans
 publisher GitHub Releases for `.tgz` assets and regenerates the registry
 idempotently, so the registry catches up if a publisher dispatch is missed.
 
+Releases of this registry tooling also dispatch the same regeneration workflow
+after the GitHub Release is created, so Pages is rebuilt with the released
+generator.
+
 ## Versioning conventions
 
 - Semver throughout.
