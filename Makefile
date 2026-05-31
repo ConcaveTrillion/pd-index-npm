@@ -1,7 +1,7 @@
 # pdomain-index-npm — static npm registry tooling
 # Usage: make <target>
 
-.PHONY: help setup install typecheck lint lint-check format-check actionlint shell-check static-check pre-commit-check test build ci ci-slow release-patch release-minor release-major _do-release regen-index smoke
+.PHONY: help setup install typecheck lint lint-check format-check actionlint shell-check static-check pre-commit-check test build ci ci-slow release-patch release-minor release-major _do-release regen-index smoke upgrade-deps
 
 REGEN_ROOT ?= _site
 
@@ -69,3 +69,6 @@ regen-index: ## Regenerate the static registry into REGEN_ROOT without copying t
 
 smoke: ## Run smoke helper
 	npm run smoke
+
+upgrade-deps: ## Upgrade npm dependencies
+	npm update
