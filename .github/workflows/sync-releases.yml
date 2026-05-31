@@ -41,7 +41,7 @@ jobs:
       - name: Regenerate index
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: make regen-index ROOT="${{ github.workspace }}/_site"
+        run: make regen-index REGEN_ROOT="${{ github.workspace }}/_site"
 
       - name: Configure Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0

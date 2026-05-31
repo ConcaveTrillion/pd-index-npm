@@ -37,8 +37,7 @@ deployment:
 REGISTRY=http://localhost:8000/ bash tests/smoke/run.sh
 ```
 
-You can also pin the package and version. The publish workflow uses this mode
-to check the package it just published:
+You can also pin the package and version to check a specific release asset:
 
 ```sh
 PACKAGE=@pdomain/test-package VERSION=0.0.1 bash tests/smoke/run.sh
@@ -46,10 +45,10 @@ PACKAGE=@pdomain/test-package VERSION=0.0.1 bash tests/smoke/run.sh
 
 ## Troubleshooting
 
-| Symptom                            | Likely cause                                           | Fix                                                                                                                              |
-| ---------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| `curl` 404 on packument URL        | Pages not yet serving the package                      | Poll the packument URL until it contains the expected package/version; check `gh-pages` branch has the files if it never appears |
-| `curl` 404 on tarball URL          | Tarball missing from `gh-pages`                        | Re-run the publish workflow                                                                                                      |
-| `npm install` fails with 404       | Packument's `dist.tarball` URL wrong                   | Check `baseUrl` in the publish workflow env var                                                                                  |
-| Installed package metadata differs | Packument points at the wrong tarball or stale content | Re-run the publish/sync workflow                                                                                                 |
-| Smoke flakes in CI                 | Pages lag exceeded the polling window                  | Increase the poll attempts/backoff in `publish.yml`'s smoke job                                                                  |
+| Symptom                            | Likely cause                                                                | Fix                                                                  |
+| ---------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `curl` 404 on packument URL        | Pages artifact deployment has not served the regenerated index yet          | Check the index regeneration workflow and Pages deployment status    |
+| `curl` 404 on tarball URL          | GitHub Release asset is missing or private                                  | Check the publisher repository release assets                        |
+| `npm install` fails with 404       | Packument's `dist.tarball` URL is not the expected GitHub Release asset URL | Regenerate the index from the publisher repository releases          |
+| Installed package metadata differs | Packument points at the wrong release asset or stale content                | Regenerate the index and verify the publisher release asset contents |
+| Smoke flakes in CI                 | Pages lag exceeded the polling window                                       | Increase the poll attempts/backoff in the smoke job                  |

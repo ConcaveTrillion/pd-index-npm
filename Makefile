@@ -5,6 +5,7 @@
 
 BASE_URL ?= https://pdomain.github.io/pdomain-index-npm/
 ROOT ?= $(CURDIR)
+REGEN_ROOT ?= _site
 EXPECTED_PACKAGE_NAME ?=
 
 help: ## Show this help message
@@ -80,8 +81,8 @@ publish-pkg: ## Publish a tarball into ROOT (set TARBALL=path or TARBALL_URL=url
 rebuild-packuments: ## Rebuild packuments under ROOT
 	npm run rebuild-packuments -- --root "$(ROOT)" --base-url "$(BASE_URL)"
 
-regen-index: ## Regenerate the static registry into ROOT without copying tarballs
-	npm run regen-index -- --root "$(ROOT)"
+regen-index: ## Regenerate the static registry into REGEN_ROOT without copying tarballs
+	npm run regen-index -- --root "$(REGEN_ROOT)"
 
 sync-releases: ## Sync GitHub Release tarballs into ROOT
 	npm run sync-releases -- --root "$(ROOT)" --base-url "$(BASE_URL)"

@@ -297,6 +297,72 @@ test("regenIndex skips release assets with the wrong package name", async () => 
   }
 });
 
+test("regenIndex skips production release asset URLs from a different GitHub repo", async () => {
+  const root = await makeRoot();
+  const tarball = await buildMinimalTarball({
+    name: "@pdomain/pdomain-ui",
+    version: "0.4.1",
+  });
+  const wrongRepoUrl =
+    "https://github.com/evil/pdomain-ui/releases/download/v0.4.1/pdomain-ui-0.4.1.tgz";
+  const originalFetch = globalThis.fetch;
+  const fetchedUrls: string[] = [];
+
+  globalThis.fetch = async (input, init) => {
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+    fetchedUrls.push(url);
+    if (
+      url ===
+      "https://fixture.test/repos/pdomain/pdomain-ui/releases?per_page=100&page=1"
+    ) {
+      return new Response(
+        JSON.stringify([
+          {
+            tag_name: "v0.4.1",
+            assets: [
+              {
+                name: "pdomain-ui-0.4.1.tgz",
+                browser_download_url: wrongRepoUrl,
+                updated_at: "2026-05-29T12:00:00.000Z",
+              },
+            ],
+          },
+        ]),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    if (url === wrongRepoUrl) {
+      return new Response(new Uint8Array(tarball), {
+        status: 200,
+        headers: { "Content-Type": "application/octet-stream" },
+      });
+    }
+    return originalFetch(input, init);
+  };
+
+  try {
+    const result = await regenIndex({
+      root,
+      githubApiBaseUrl: "https://fixture.test",
+      repos: ["pdomain/pdomain-ui"],
+    });
+
+    assert.deepEqual(result.generated, []);
+    assert.deepEqual(result.published, []);
+    assert.equal(result.skipped.length, 1);
+    assert.match(result.skipped[0], /wrong GitHub release asset repo/);
+    assert.match(result.skipped[0], /evil\/pdomain-ui/);
+    assert.equal(fetchedUrls.includes(wrongRepoUrl), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("regenIndex fetches release pages until the cap when every page is full", async () => {
   const root = await makeRoot();
   const { server, baseUrl, releasePageRequests } = await startGithubFixture(
@@ -418,6 +484,80 @@ test("regenIndex fails when a downloaded tarball exceeds configured maxTarballBy
         allowNonGithubAssetHostsForTests: true,
       }),
       /Tarball exceeds maximum size/,
+    );
+  } finally {
+    server.close();
+  }
+});
+
+test("regenIndex fails when decompressed tarball data exceeds configured maxDecompressedBytes", async () => {
+  const root = await makeRoot();
+  const tarball = await buildMinimalTarball({
+    name: "@pdomain/pdomain-ui",
+    version: "0.6.1",
+  });
+
+  const releases: unknown[] = [];
+  const { server, baseUrl } = await startGithubFixture(releases, {
+    "/assets/pdomain-ui-0.6.1.tgz": tarball,
+  });
+  releases.push({
+    tag_name: "v0.6.1",
+    assets: [
+      {
+        name: "pdomain-ui-0.6.1.tgz",
+        browser_download_url: `${baseUrl}/assets/pdomain-ui-0.6.1.tgz`,
+      },
+    ],
+  });
+
+  try {
+    await assert.rejects(
+      regenIndex({
+        root,
+        githubApiBaseUrl: baseUrl,
+        repos: ["pdomain/pdomain-ui"],
+        maxDecompressedBytes: 1,
+        allowNonGithubAssetHostsForTests: true,
+      }),
+      /Tarball decompressed data exceeds maximum size/,
+    );
+  } finally {
+    server.close();
+  }
+});
+
+test("regenIndex fails when package.json exceeds configured maxPackageJsonBytes", async () => {
+  const root = await makeRoot();
+  const tarball = await buildMinimalTarball({
+    name: "@pdomain/pdomain-ui",
+    version: "0.6.2",
+  });
+
+  const releases: unknown[] = [];
+  const { server, baseUrl } = await startGithubFixture(releases, {
+    "/assets/pdomain-ui-0.6.2.tgz": tarball,
+  });
+  releases.push({
+    tag_name: "v0.6.2",
+    assets: [
+      {
+        name: "pdomain-ui-0.6.2.tgz",
+        browser_download_url: `${baseUrl}/assets/pdomain-ui-0.6.2.tgz`,
+      },
+    ],
+  });
+
+  try {
+    await assert.rejects(
+      regenIndex({
+        root,
+        githubApiBaseUrl: baseUrl,
+        repos: ["pdomain/pdomain-ui"],
+        maxPackageJsonBytes: 1,
+        allowNonGithubAssetHostsForTests: true,
+      }),
+      /Tarball package\.json exceeds maximum size/,
     );
   } finally {
     server.close();

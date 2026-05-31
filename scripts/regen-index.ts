@@ -280,22 +280,50 @@ async function listReleases(
 }
 
 function isAllowedAssetUrl(
+  repo: string,
   url: string,
   allowNonGithubAssetHostsForTests: boolean,
-): boolean {
-  if (allowNonGithubAssetHostsForTests) return true;
-  const parsed = new URL(url);
-  return (
-    parsed.protocol === "https:" &&
-    (parsed.hostname === "github.com" ||
-      parsed.hostname === "objects.githubusercontent.com")
-  );
+): { allowed: true } | { allowed: false; reason: string } {
+  if (allowNonGithubAssetHostsForTests) return { allowed: true };
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { allowed: false, reason: "invalid URL" };
+  }
+
+  const [owner, name] = repo.split("/");
+  const pathParts = parsed.pathname.split("/");
+  const releaseAssetPathMatches =
+    pathParts.length >= 7 &&
+    pathParts[1] === owner &&
+    pathParts[2] === name &&
+    pathParts[3] === "releases" &&
+    pathParts[4] === "download" &&
+    pathParts[pathParts.length - 1].endsWith(".tgz");
+
+  if (parsed.protocol !== "https:" || parsed.hostname !== "github.com") {
+    return {
+      allowed: false,
+      reason: "not a github.com HTTPS release asset URL",
+    };
+  }
+  if (!releaseAssetPathMatches) {
+    return {
+      allowed: false,
+      reason: `wrong GitHub release asset repo or path for ${repo}`,
+    };
+  }
+
+  return { allowed: true };
 }
 
 function releaseTarballAssets(
   repo: string,
   releases: GithubRelease[],
   allowNonGithubAssetHostsForTests: boolean,
+  skipped: string[],
 ): TarballAsset[] {
   const assets: TarballAsset[] = [];
   for (const release of releases) {
@@ -306,7 +334,15 @@ function releaseTarballAssets(
           ? asset.browser_download_url
           : "";
       if (!name.endsWith(".tgz") || !url) continue;
-      if (!isAllowedAssetUrl(url, allowNonGithubAssetHostsForTests)) continue;
+      const allowed = isAllowedAssetUrl(
+        repo,
+        url,
+        allowNonGithubAssetHostsForTests,
+      );
+      if (!allowed.allowed) {
+        skipped.push(`${url} (${allowed.reason})`);
+        continue;
+      }
       assets.push({
         repo,
         url,
@@ -465,6 +501,7 @@ export async function regenIndex(
       repo,
       releases,
       allowNonGithubAssetHostsForTests,
+      skipped,
     )) {
       const indexed = await indexTarballAsset(asset, {
         maxTarballBytes,
